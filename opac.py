@@ -1,5 +1,7 @@
+import re
 import sys
 import math
+import string
 
 ''' ################################
         PRIVATE - SCRAP CLASS
@@ -15,32 +17,41 @@ class Scrap:
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
 
-    def make_regex(self, string):
-        pass
+    def make_regex(self, elements):
+        result = ''
+        for element in elements:
+            if char in string.letters:
+                result += '\w'
+            elif char in string.digits:
+                result += '\d'
+            else:
+                result += char
+        return result
 
 
     def get_filters(self):
-        _filter = []
+        regexes = []
 
         paths = self.node.paths_per_depth(self.depth)
+
+        for path in paths:
+            print path
 
         for index in range(0, self.depth):
             column = [path[index] for path in paths]
             components = set(column)
 
             if len(components) == 1:
-                _filter.append(components.pop())
+                regexes.append(components.pop())
                 continue
             
-            chars = {'digits': 0, 'letters':0, 'punctuation':0}
             for component in list(components):
-                for char in component:
-                    if char in chars:
-                        chars[char] += 1
-                    else:
-                        chars[char]  = 1
+                elements = re.findall('(\d+|[a-zA-Z]+|[^a-zA-Z\d]+)', component)
+                self.make_regex(elements)
 
-            print chars
+                print '({2}){0} - {1}'.format(elements, component, index)
+
+        print regexes
 
 
 ''' ################################
@@ -72,6 +83,10 @@ class PathNode:
         return (expectation, deviation)
 
 
+    '''
+        Genera todos los paths existentes en el arbol para una profundidad
+        establecida.
+    '''
     def paths_per_depth(self, depth, path=[]):
         _path = path + [self.name]
         if self.depth == depth:
@@ -108,7 +123,6 @@ class PathNode:
         scrap = []
 
         depths = self._weight_per_depth()
-        print depths
         for depth, depth_weight in depths.iteritems():
             if depth_weight >= weight:
                 scrap.append(Scrap(self, depth, depth_weight))
@@ -129,15 +143,21 @@ class PathNode:
     '''
     def add_path(self, path):
 
-        self.weight += 1
-
         root = path[0]
+        w_value = True
 
         if root not in self.children:
             self.children[root] = PathNode(root, self, self.depth+1)
+        else:
+            w_value = False
 
         if len(path) > 1:
-            self.children[root].add_path(path[1:])
+            w_value = self.children[root].add_path(path[1:])
+                
+        if w_value:
+            self.weight += 1
+
+        return w_value
 
     ''' #######################################################################
         Obtenemos todo un subarbol, a partir de un path
@@ -204,8 +224,9 @@ class OPaC:
             _scrap = node.get_scrap(weight_e + weight_devn)
             scrap.extend(_scrap)
 
-            for s in _scrap:
-                s.get_filters()
+        for _scrap in scrap:
+            _scrap.get_filters()
+            print '------------------------------------------------------------'
 
         return scrap
 
