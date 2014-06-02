@@ -17,16 +17,70 @@ class Scrap:
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
 
-    def make_regex(self, elements):
-        result = ''
-        for element in elements:
-            if char in string.letters:
-                result += '\w'
-            elif char in string.digits:
-                result += '\d'
-            else:
-                result += char
-        return result
+    def compress_regex(self, items):
+        result = items
+
+        # Spliteamos los items en chunks de diferentes tamanios, que comparamos
+        size = 2
+        while True:
+            
+            # Si nacen menos de 2 chunks del tamanio propuesto, abandonamos el proceso
+            chunks = [result[i:i+size] for i in range(0, len(result), size)]
+            tail = []
+            if len(chunks[-1]) != size:
+                tail = chunks[-1]
+
+            if len(chunks) < 2:
+                break
+
+            _result = []
+
+            first_chunk = chunks[0]
+            for chunk in chunks[1:]:
+                if len(chunk) != size:
+                    _result.extend(chunk)
+                else:
+                    keys1 = [t[0] for t in first_chunk]
+                    keys2 = [t[0] for t in chunk]
+
+                    # Comparamos los elementos de los diferentes chunks
+                    keys = [keys1[i] for i in range(0, size) if keys1[i] == keys2[i]]
+
+                    # Si los elementos son los mismos entre los chunks, los juntamos
+                    if len(keys) == size:
+                        for i in range(0, size):
+                            first_chunk[i][1].extend(chunk[i][1])
+                    else:
+                        _result.extend(first_chunk)
+                        first_chunk = chunk
+
+            print "[!] _result: {0}".format(_result)
+
+            if len(_result) == len(result):
+                size += 1
+
+
+    def make_regex(self, entries):
+        regex = ''
+
+        for entry in entries:
+            elements = re.findall('(\d+|[^\W_\d]+|[\W_])', entry)
+
+            _regex = []
+            for element in elements:
+                first_c = element[0]
+                if re.match('[^\W_\d]', first_c):
+                    _regex.append(('[^\W_\d]', [len(element)]))
+                elif re.match('\d', first_c):
+                    _regex.append(('\d', [len(element)]))
+                else:
+                    _regex.append(('\\' + first_c, [1]))
+
+            __regex = self.compress_regex(_regex)
+
+            print '{0} - {1} - {2}'.format(elements, entry, _regex)
+
+        return regex
 
 
     def get_filters(self):
@@ -39,17 +93,14 @@ class Scrap:
 
         for index in range(0, self.depth):
             column = [path[index] for path in paths]
-            components = set(column)
+            entries = set(column)
 
-            if len(components) == 1:
-                regexes.append(components.pop())
+            if len(entries) == 1:
+                regexes.append(entries.pop())
                 continue
             
-            for component in list(components):
-                elements = re.findall('(\d+|[a-zA-Z]+|[^a-zA-Z\d]+)', component)
-                self.make_regex(elements)
-
-                print '({2}){0} - {1}'.format(elements, component, index)
+            print '#'*10 + '({0})'.format(index) + '#'*10
+            regex = self.make_regex(list(entries))
 
         print regexes
 
