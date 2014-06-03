@@ -26,10 +26,13 @@ class Scrap:
             
             # Si nacen menos de 2 chunks del tamanio propuesto, abandonamos el proceso
             chunks = [result[i:i+size] for i in range(0, len(result), size)]
+
             tail = []
             if len(chunks[-1]) != size:
                 tail = chunks[-1]
+                chunks = chunks[:-1]
 
+            #print 'size = {0} | chucks = {1}'.format(size, len(chunks))
             if len(chunks) < 2:
                 break
 
@@ -37,48 +40,60 @@ class Scrap:
 
             first_chunk = chunks[0]
             for chunk in chunks[1:]:
-                if len(chunk) != size:
-                    _result.extend(chunk)
+
+                keys1 = [t[0] for t in first_chunk]
+                keys2 = [t[0] for t in chunk]
+
+                # Comparamos los elementos de los diferentes chunks
+                keys = [keys1[i] for i in range(0, size) if keys1[i] == keys2[i]]
+
+                # Si los elementos son los mismos entre los chunks, los juntamos
+                if len(keys) == size:
+                    for i in range(0, size):
+                        first_chunk[i][1].extend(chunk[i][1])
                 else:
-                    keys1 = [t[0] for t in first_chunk]
-                    keys2 = [t[0] for t in chunk]
+                    _result.extend(first_chunk)
+                    first_chunk = chunk
 
-                    # Comparamos los elementos de los diferentes chunks
-                    keys = [keys1[i] for i in range(0, size) if keys1[i] == keys2[i]]
+            _result.extend(first_chunk)
+            _result.extend(tail)
 
-                    # Si los elementos son los mismos entre los chunks, los juntamos
-                    if len(keys) == size:
-                        for i in range(0, size):
-                            first_chunk[i][1].extend(chunk[i][1])
-                    else:
-                        _result.extend(first_chunk)
-                        first_chunk = chunk
-
-            print "[!] _result: {0}".format(_result)
+            #print '[!] _result: {0}'.format(_result)
 
             if len(_result) == len(result):
                 size += 1
+
+            result = _result
+
+        #print '__result: {0}'.format(result)
+        #print '------------------------------------------------------'
+        return result
 
 
     def make_regex(self, entries):
         regex = ''
 
         for entry in entries:
-            elements = re.findall('(\d+|[^\W_\d]+|[\W_])', entry)
+            elements = re.findall('(\d+|[^\W_]+|[\W_])', entry)
 
             _regex = []
             for element in elements:
                 first_c = element[0]
-                if re.match('[^\W_\d]', first_c):
-                    _regex.append(('[^\W_\d]', [len(element)]))
-                elif re.match('\d', first_c):
+                if re.match('\d', first_c):
                     _regex.append(('\d', [len(element)]))
+                elif re.match('[^\W_]', first_c):
+                    _regex.append(('[^\W_]', [len(element)]))
+                elif _regex and (_regex[-1][0] == '\\' + first_c):
+                    ''' Si existen dos ocurrencias del mismo simbolo,
+                        incrementamos en 1 el numero de ocurrencias, sin
+                        agregar un nuevo numero a la cantidad
+                    '''
+                    _regex[-1][1][0] += 1
                 else:
                     _regex.append(('\\' + first_c, [1]))
 
             __regex = self.compress_regex(_regex)
-
-            print '{0} - {1} - {2}'.format(elements, entry, _regex)
+            print '{1} - {0}'.format(entry, __regex)
 
         return regex
 
@@ -287,7 +302,8 @@ uris = fd.readlines()
 fd.close()
 
 paths = [uri.strip().split('/')[3:] for uri in uris]
-paths = [path for path in paths if [sdir for sdir in path if sdir]]
+paths = [[sdir for sdir in path if sdir] for path in paths]
+paths = [path for path in paths if path]
 
 opac = OPaC()
 for path in paths:
