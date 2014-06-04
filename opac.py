@@ -3,6 +3,8 @@ import sys
 import math
 import string
 
+from opac_regex import OPaCRegex
+
 ''' ################################
         PRIVATE - SCRAP CLASS
     ################################
@@ -17,6 +19,7 @@ class Scrap:
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
 
+    '''
     def compress_regex(self, items):
         result = items
 
@@ -84,10 +87,9 @@ class Scrap:
                 elif re.match('[^\W_]', first_c):
                     _regex.append(('[^\W_]', [len(element)]))
                 elif _regex and (_regex[-1][0] == '\\' + first_c):
-                    ''' Si existen dos ocurrencias del mismo simbolo,
-                        incrementamos en 1 el numero de ocurrencias, sin
-                        agregar un nuevo numero a la cantidad
-                    '''
+                    # Si existen dos ocurrencias del mismo simbolo,
+                    #    incrementamos en 1 el numero de ocurrencias, sin
+                    #    agregar un nuevo numero a la cantidad
                     _regex[-1][1][0] += 1
                 else:
                     _regex.append(('\\' + first_c, [1]))
@@ -134,6 +136,7 @@ class Scrap:
             print '{0} - {1}'.format(regex, regexes[regex])
 
         return regex
+    '''
 
 
     def get_filters(self):
@@ -153,7 +156,11 @@ class Scrap:
                 continue
             
             print '#'*10 + '({0})'.format(index) + '#'*10
-            regex = self.make_regex(list(entries))
+
+            # Armamos una expresion regular que contemple el mayor numero
+            # de elementos en la columna
+            opac_regex = OPaCRegex(list(entries))
+            opac_regex.digest()
 
         print regexes
 
