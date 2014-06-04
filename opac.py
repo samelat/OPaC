@@ -71,8 +71,8 @@ class Scrap:
 
 
     def make_regex(self, entries):
-        regex = ''
 
+        regex_info = {}
         for entry in entries:
             elements = re.findall('(\d+|[^\W_]+|[\W_])', entry)
 
@@ -93,7 +93,45 @@ class Scrap:
                     _regex.append(('\\' + first_c, [1]))
 
             __regex = self.compress_regex(_regex)
-            print '{1} - {0}'.format(entry, __regex)
+            # print '{1} - {0}'.format(entry, __regex)
+
+            regex_key = tuple([t[0] for t in __regex])
+            if regex_key not in regex_info:
+                regex_info[regex_key] = {}
+                for key in regex_key:
+                    regex_info[regex_key][key] = set([])
+
+            for element, values in __regex:
+                regex_info[regex_key][element].update(values)
+
+        regexes = {}
+        for regex_key in regex_info:
+            regex = '^'
+            for element in regex_key:
+                quantifier = ''
+                values = list(regex_info[regex_key][element])
+                values.sort()
+                if len(values) == 1:
+                    quantifier = '{{{0}}}'.format(values[0])
+                elif len(values) == 2:
+                    quantifier = '{{{0},{1}}}'.format(*values)
+                else:
+                    quantifier = '+'
+                regex += element + quantifier
+            regex += '$'
+
+            regexes[regex] = 0
+
+
+        for entry in entries:
+            for regex in regexes:
+                if re.match(regex, entry):
+                    regexes[regex] += 1
+
+        print entries
+        print 'total = {0}'.format(len(entries))
+        for regex in regexes:
+            print '{0} - {1}'.format(regex, regexes[regex])
 
         return regex
 
@@ -103,8 +141,8 @@ class Scrap:
 
         paths = self.node.paths_per_depth(self.depth)
 
-        for path in paths:
-            print path
+        #for path in paths:
+        #    print path
 
         for index in range(0, self.depth):
             column = [path[index] for path in paths]
