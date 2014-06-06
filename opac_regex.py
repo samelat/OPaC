@@ -47,21 +47,28 @@ class OPaCRegexInnerNode(OPaCRegexNode):
             if len(chunks) < 2:
                 break
 
+            ####################################################### ESTA MAL
             nodes = [OPaCRegexInnerNode(chunk) for chunk in chunks]
 
-            rest = nodes[0]
+            first_node = nodes[0]
             compressed = []
+            merging = False
             for node in nodes[1:]:
-
-                if nodes[index] == nodes[index+1]:
-                    nodes[index].fuse(nodes[index+1], lambda l1, l2 : [l1[0] + l2[0]])
-
-                    rest = None
+                if first_node == node:
+                    first_node.fuse(node, lambda l1, l2 : [l1[0] + l2[0]])
+                    merging = True
                 else:
-                    compressed.extend(nodes[index].nodes)
-                    rest = nodes[index+1].nodes
-            if rest:
-                compressed.extend(rest)
+                    if merging:
+                        compressed.append(first_node)
+                    else:
+                        compressed.extend(first_node.nodes)
+                    merging = False
+                    first_node = node
+
+            if first_node == nodes[-1]:
+                compressed.extend(first_node.nodes)
+
+            #######################################################
 
             compressed.extend(tail)
 
@@ -113,7 +120,7 @@ class OPaCRegex:
             
             print '*'*20
             opac_regex.compress()
-            print opac_regex
+            print '[+] compressed: {0}'.format(opac_regex)
             
             regex_key = opac_regex.key()
             if regex_key in opac_regexes:
