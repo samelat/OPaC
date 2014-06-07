@@ -18,135 +18,17 @@ class Scrap:
     def __str__(self):
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
+    def get_filter(self):
 
-    '''
-    def compress_regex(self, items):
-        result = items
-
-        # Spliteamos los items en chunks de diferentes tamanios, que comparamos
-        size = 2
-        while True:
-            
-            # Si nacen menos de 2 chunks del tamanio propuesto, abandonamos el proceso
-            chunks = [result[i:i+size] for i in range(0, len(result), size)]
-
-            tail = []
-            if len(chunks[-1]) != size:
-                tail = chunks[-1]
-                chunks = chunks[:-1]
-
-            #print 'size = {0} | chucks = {1}'.format(size, len(chunks))
-            if len(chunks) < 2:
-                break
-
-            _result = []
-
-            first_chunk = chunks[0]
-            for chunk in chunks[1:]:
-
-                keys1 = [t[0] for t in first_chunk]
-                keys2 = [t[0] for t in chunk]
-
-                # Comparamos los elementos de los diferentes chunks
-                keys = [keys1[i] for i in range(0, size) if keys1[i] == keys2[i]]
-
-                # Si los elementos son los mismos entre los chunks, los juntamos
-                if len(keys) == size:
-                    for i in range(0, size):
-                        first_chunk[i][1].extend(chunk[i][1])
-                else:
-                    _result.extend(first_chunk)
-                    first_chunk = chunk
-
-            _result.extend(first_chunk)
-            _result.extend(tail)
-
-            #print '[!] _result: {0}'.format(_result)
-
-            if len(_result) == len(result):
-                size += 1
-
-            result = _result
-
-        #print '__result: {0}'.format(result)
-        #print '------------------------------------------------------'
-        return result
-
-
-    def make_regex(self, entries):
-
-        regex_info = {}
-        for entry in entries:
-            elements = re.findall('(\d+|[^\W_]+|[\W_])', entry)
-
-            _regex = []
-            for element in elements:
-                first_c = element[0]
-                if re.match('\d', first_c):
-                    _regex.append(('\d', [len(element)]))
-                elif re.match('[^\W_]', first_c):
-                    _regex.append(('[^\W_]', [len(element)]))
-                elif _regex and (_regex[-1][0] == '\\' + first_c):
-                    # Si existen dos ocurrencias del mismo simbolo,
-                    #    incrementamos en 1 el numero de ocurrencias, sin
-                    #    agregar un nuevo numero a la cantidad
-                    _regex[-1][1][0] += 1
-                else:
-                    _regex.append(('\\' + first_c, [1]))
-
-            __regex = self.compress_regex(_regex)
-            # print '{1} - {0}'.format(entry, __regex)
-
-            regex_key = tuple([t[0] for t in __regex])
-            if regex_key not in regex_info:
-                regex_info[regex_key] = {}
-                for key in regex_key:
-                    regex_info[regex_key][key] = set([])
-
-            for element, values in __regex:
-                regex_info[regex_key][element].update(values)
-
-        regexes = {}
-        for regex_key in regex_info:
-            regex = '^'
-            for element in regex_key:
-                quantifier = ''
-                values = list(regex_info[regex_key][element])
-                values.sort()
-                if len(values) == 1:
-                    quantifier = '{{{0}}}'.format(values[0])
-                elif len(values) == 2:
-                    quantifier = '{{{0},{1}}}'.format(*values)
-                else:
-                    quantifier = '+'
-                regex += element + quantifier
-            regex += '$'
-
-            regexes[regex] = 0
-
-
-        for entry in entries:
-            for regex in regexes:
-                if re.match(regex, entry):
-                    regexes[regex] += 1
-
-        print entries
-        print 'total = {0}'.format(len(entries))
-        for regex in regexes:
-            print '{0} - {1}'.format(regex, regexes[regex])
-
-        return regex
-    '''
-
-
-    def get_filters(self):
         regexes = []
-
         paths = self.node.paths_per_depth(self.depth)
 
-        #for path in paths:
-        #    print path
+        print '#'*20
 
+        for path in paths:
+            print path
+
+        _filter = ''
         for index in range(0, self.depth):
             column = [path[index] for path in paths]
             entries = set(column)
@@ -154,15 +36,21 @@ class Scrap:
             if len(entries) == 1:
                 regexes.append(entries.pop())
                 continue
-            
-            print '#'*10 + '({0})'.format(index) + '#'*10
 
             # Armamos una expresion regular que contemple el mayor numero
             # de elementos en la columna
             opac_regex = OPaCRegex(list(entries))
-            opac_regex.digest()
+            regexes.append(opac_regex.digest())
 
-        print regexes
+        _filter =  '^' + '/'.join(regexes) + '$'
+
+        count = 0
+        print _filter
+        for path in paths:
+            if re.match(_filter, '/'.join(path)):
+                count += 1
+
+        print 'performance: {0}/{1}'.format(count, len(paths))
 
 
 ''' ################################
@@ -249,18 +137,18 @@ class PathNode:
 
 
     ''' #######################################################################
-        Add a new path into the collection, filtering it if match with any
-        expresion or if it was previously added.
+        Add a new path into the tree.
+        Return False if the path already exists.
     '''
     def add_path(self, path):
 
         root = path[0]
         w_value = True
 
-        if root not in self.children:
-            self.children[root] = PathNode(root, self, self.depth+1)
-        else:
+        if root in self.children:
             w_value = False
+        else:
+            self.children[root] = PathNode(root, self, self.depth+1)
 
         if len(path) > 1:
             w_value = self.children[root].add_path(path[1:])
@@ -311,10 +199,29 @@ class PathNode:
 '''
 class OPaC:
     def __init__(self):
+        self.limit_per_filter_entry = 4
+        self.paths = []
+        self.filters = {}
         self.tree = PathNode('')
 
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if not self.paths:
+            raise StopIteration
+        else:
+            return self.paths.pop(random.randint(0, len(self.paths)))
+
     def add_path(self, path):
-        self.tree.add_path(path)
+        if self.tree.add_path(path):
+            for _filter, entries in self.filters.iteritems():
+                if _filter.match(path):
+                    if entries:
+                        self.filters[_filter] -= 1
+                        break
+                    return
+            self.paths.append(path)
 
     ''' #######################################################################
         Obtenemos todos los nodos que tienen claras caracteristicas que los
@@ -335,11 +242,21 @@ class OPaC:
             _scrap = node.get_scrap(weight_e + weight_devn)
             scrap.extend(_scrap)
 
+        '''
+            Cambiar las claves de self.filters por los strings, porque sino, cuando
+            busquemos si la regex ya esta creada, nunca la va a encontrar (todas las
+            instancias de re.compile son diferentes).
+            Meter todas las regex generadas por los scraps en una lista y estando
+            compiladas, recien ahi iterar la lista. Creo que puede ser mas eficiente.
+        '''
         for _scrap in scrap:
-            _scrap.get_filters()
+            _filter = _scrap.get_filter()
+            _filter = re.compile(_filter)
+            if _filter not in self.filters:
+                self.filters[_filter] = self.limit_per_filter_entry
             print '------------------------------------------------------------'
 
-        return scrap
+            survivor_paths = filter(_filter.match, self.paths)
 
 
 fd = open(sys.argv[1], 'r')

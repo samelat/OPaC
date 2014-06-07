@@ -1,15 +1,14 @@
 import re
 
-
+''' ###############################
+     PRIVATE - OPACREGEXNODE CLASS
+    ###############################
+'''
 class OPaCRegexNode:
     def __init__(self, first_value):
         self.occurrences = [first_value]
 
-    def fuse(self, node, way):
-        self.occurrences = way(self.occurrences, node.occurrences)
-
     def quantifier(self):
-        #print self.occurrences
         qs = list(set(self.occurrences))
         qs.sort()
         weight = len(qs)
@@ -29,7 +28,10 @@ class OPaCRegexNode:
     def __str__(self):
         return str(self.key())
 
-
+''' ####################################
+     PRIVATE - OPACREGEXINNERNODE CLASS
+    ####################################
+'''
 class OPaCRegexInnerNode(OPaCRegexNode):
     def __init__(self, nodes=[]):
         OPaCRegexNode.__init__(self, 1)
@@ -47,12 +49,18 @@ class OPaCRegexInnerNode(OPaCRegexNode):
         for i in range(0, len(self.nodes)):
             self.nodes[i].fuse(node.nodes[i], way)
 
-    def render(self):
-        result = '('
+    def render(self, wrapper=False):
+        result = ''
+        if wrapper:
+            result = '('
+
         for node in self.nodes:
-            result += node.render()
-        result += ')'
-        return result + self.quantifier()
+            result += node.render(True)
+
+        if wrapper:
+            result += ')' + self.quantifier()
+
+        return result
 
 
     def compress(self):
@@ -77,7 +85,7 @@ class OPaCRegexInnerNode(OPaCRegexNode):
             merging = False
             for node in _nodes[1:]:
                 if first_node == node:
-                    first_node.fuse(node, lambda l1, l2 : l1 + l2)
+                    first_node.fuse(node, lambda l1, l2 : [l1[0] + l2[0]])
                     merging = True
                 else:
                     if merging:
@@ -101,9 +109,13 @@ class OPaCRegexInnerNode(OPaCRegexNode):
             elif len(self.nodes) >= (index + 2*size):
                 index += 1
             else:
+                index = 0
                 size += 1
 
-
+''' ###################################
+     PRIVATE - OPACREGEXLEAFNODE CLASS
+    ###################################
+'''
 class OPaCRegexLeafNode(OPaCRegexNode):
     def __init__(self, value, length):
         OPaCRegexNode.__init__(self, length)
@@ -112,15 +124,20 @@ class OPaCRegexLeafNode(OPaCRegexNode):
     def key(self):
         return self.value
 
-    def render(self):
+    def render(self, outer=True):
         return self.value + self.quantifier()
 
+    def fuse(self, node, way):
+        self.occurrences += node.occurrences
 
+''' ##########################
+     PUBLIC - OPACREGEX CLASS
+    ##########################
+'''
 class OPaCRegex:
     def __init__(self, entries):
         self.entries = entries
         self.tree = None
-
 
     def digest(self):
         opac_regexes = {}
@@ -161,21 +178,20 @@ class OPaCRegex:
         best_regex = '$.+^'
         for key, node in opac_regexes.iteritems():
 
-            result = '^'
-            result += node.render()
-            result += '$'
+            result = node.render()
 
             if result not in performance:
                 performance[result] = 0
             
             for entry in self.entries:
-                if re.match(result, entry):
+                if re.match('^' + result + '$', entry):
                     performance[result] += 1
 
             if performance[best_regex] < performance[result]:
                 best_regex = result
 
         print 'regex = {0} - {1}'.format(best_regex, performance[best_regex])
+        return best_regex
             
 
 
