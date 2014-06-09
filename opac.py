@@ -1,5 +1,4 @@
 import re
-import sys
 import math
 import string
 
@@ -42,7 +41,7 @@ class Scrap:
             opac_regex = OPaCRegex(list(entries))
             regexes.append(opac_regex.digest())
 
-        _filter =  '^' + '/'.join(regexes) + '$'
+        _filter =  '^/' + '/'.join(regexes) + '$'
 
         count = 0
         print _filter
@@ -51,6 +50,7 @@ class Scrap:
                 count += 1
 
         print 'performance: {0}/{1}'.format(count, len(paths))
+        return _filter
 
 
 ''' ################################
@@ -214,11 +214,13 @@ class OPaC:
             return self.paths.pop(random.randint(0, len(self.paths)))
 
     def add_path(self, path):
-        if self.tree.add_path(path):
-            for _filter, entries in self.filters.iteritems():
-                if _filter.match(path):
+        spath = path.strip('/').split('/')
+        if spath and self.tree.add_path(spath):
+            print path
+            for _sfilter, (_cfilter, entries) in self.filters.iteritems():
+                if _cfilter.match(path):
                     if entries:
-                        self.filters[_filter] -= 1
+                        self.filters[_sfilter] = (_cfilter, entries - 1)
                         break
                     return
             self.paths.append(path)
@@ -249,27 +251,15 @@ class OPaC:
             Meter todas las regex generadas por los scraps en una lista y estando
             compiladas, recien ahi iterar la lista. Creo que puede ser mas eficiente.
         '''
+        survivor_paths = self.paths
         for _scrap in scrap:
-            _filter = _scrap.get_filter()
-            _filter = re.compile(_filter)
-            if _filter not in self.filters:
-                self.filters[_filter] = self.limit_per_filter_entry
+            _sfilter = _scrap.get_filter()
+            print _sfilter
+            _cfilter = re.compile(_sfilter)
+            if _sfilter not in self.filters:
+                self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)
             print '------------------------------------------------------------'
-
-            survivor_paths = filter(_filter.match, self.paths)
-
-
-fd = open(sys.argv[1], 'r')
-uris = fd.readlines()
-fd.close()
-
-paths = [uri.strip().split('/')[3:] for uri in uris]
-paths = [[sdir for sdir in path if sdir] for path in paths]
-paths = [path for path in paths if path]
-
-opac = OPaC()
-for path in paths:
-    opac.add_path(path)
-
-opac.clean()
+            #print survivor_paths
+            survivor_paths = filter(lambda x: not bool(_cfilter.match(x)), survivor_paths)
+        self.paths = survivor_paths
 
