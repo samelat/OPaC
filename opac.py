@@ -1,6 +1,7 @@
 import re
 import math
 import string
+import random
 
 from opac_regex import OPaCRegex
 
@@ -17,7 +18,7 @@ class Scrap:
     def __str__(self):
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
-    def get_filter(self):
+    def get_regexes(self):
 
         regexes = []
         paths = self.node.paths_per_depth(self.depth)
@@ -41,16 +42,14 @@ class Scrap:
             opac_regex = OPaCRegex(list(entries))
             regexes.append(opac_regex.digest())
 
-        _filter =  '^/' + '/'.join(regexes) + '$'
+        return regexes
 
-        count = 0
-        print _filter
-        for path in paths:
-            if re.match(_filter, '/'.join(path)):
-                count += 1
 
-        print 'performance: {0}/{1}'.format(count, len(paths))
-        return _filter
+    ''' Eliminamos todas las entradas del arbol que matcheen con el
+        filtro especificado.
+    '''
+    def clean(self, filter):
+
 
 
 ''' ################################
@@ -176,6 +175,22 @@ class PathNode:
 
         return node
 
+    '''
+
+    '''
+    def remove_path(self, path_regexes):
+        if len(path_regexes) > 1:
+            children = {}
+            for name, child in self.children:
+                if re.match('^' + path_regexes[1] + '$', name):
+                    child.remove_path(path_regexes[1:])
+                    if len(child.children) > 0:
+                        children[name] = child
+                else:
+                    children[name] = child
+                
+            self.children = children
+
     ''' #######################################################################
 
     '''
@@ -211,12 +226,14 @@ class OPaC:
         if not self.paths:
             raise StopIteration
         else:
-            return self.paths.pop(random.randint(0, len(self.paths)))
+            return self.paths.pop(random.randint(0, len(self.paths) -1))
+
+    def size(self):
+        return len(self.paths)
 
     def add_path(self, path):
         spath = path.strip('/').split('/')
         if spath and self.tree.add_path(spath):
-            print path
             for _sfilter, (_cfilter, entries) in self.filters.iteritems():
                 if _cfilter.match(path):
                     if entries:
@@ -253,7 +270,21 @@ class OPaC:
         '''
         survivor_paths = self.paths
         for _scrap in scrap:
-            _sfilter = _scrap.get_filter()
+            regexes = _scrap.get_regexes()
+
+            self.tree.remove_path(regexes)
+
+            _sfilter =  '^/' + '/'.join(regexes) + '$'
+
+            ################ DEBUG ###############
+            # count = 0
+            # for path in paths:
+            #     if re.match(_filter, '/'.join(path)):
+            #         count += 1
+            # 
+            # print 'performance: {0}/{1}'.format(count, len(paths))
+            ######################################
+
             print _sfilter
             _cfilter = re.compile(_sfilter)
             if _sfilter not in self.filters:
@@ -261,5 +292,6 @@ class OPaC:
             print '------------------------------------------------------------'
             #print survivor_paths
             survivor_paths = filter(lambda x: not bool(_cfilter.match(x)), survivor_paths)
+
         self.paths = survivor_paths
 

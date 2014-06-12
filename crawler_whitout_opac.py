@@ -1,14 +1,15 @@
 import re
 import sys
 import time
+import urllib2
 import urlparse
 from lxml import etree
 
-from opac import OPaC
+if len(sys.argv) < 2:
+	print './test <url>'
+	sys.exit(-1)
+domain = sys.argv[1]
 
-import urllib2
-
-domain = 'http://www.cert.unlp.edu.ar'
 container = [domain]
 ready = set(container)
 
