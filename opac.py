@@ -51,14 +51,14 @@ class Scrap:
 '''
 class PathNode:
 
-    def __init__(self, name, parent=None, depth=0):
+    def __init__(self, name, parent=None, depth=0, weight=1):
         self.children = {}
         self.parent = parent
         self.name = name
         self.depth = depth
+        self.weight = weight
 
         self.same_depth = 0
-        self.weight = 0
 
     ''' #######################################################################
         Este metodo calcula la esperanza y la desviacion estandar con respecto
@@ -130,25 +130,20 @@ class PathNode:
 
     ''' #######################################################################
         Add a new path into the tree.
-        Return False if the path already exists.
     '''
     def add_path(self, path):
 
-        root = path[0]
-        w_value = True
+        child_name = path[0]
 
-        if root in self.children:
-            w_value = False
+        if child_name in self.children:
+            self.weight += 1
         else:
-            self.children[root] = PathNode(root, self, self.depth+1)
+            if self.children:
+                self.weight += 1
+            self.children[child_name] = PathNode(child_name, self, self.depth+1)
 
         if len(path) > 1:
-            w_value = self.children[root].add_path(path[1:])
-                
-        if w_value:
-            self.weight += 1
-
-        return w_value
+            self.children[child_name].add_path(path[1:])
 
     ''' #######################################################################
         Obtenemos todo un subarbol, a partir de un path
@@ -174,18 +169,19 @@ class PathNode:
     def remove_path(self, path_regexes):
 
         # print '[RGX]({0}) - {1}'.format(self.name, path_regexes)
-
-        if not (path_regexes and re.match('^' + path_regexes[0] + '$', self.name)):
-            return False
+        if not path_regexes:
+            return True
 
         if self.children:
             children = {}
+            self.weight = 0
             for name, child in self.children.iteritems():
-                if child.remove_path(path_regexes[1:]):
-                    self.weight -= 1
-                else:
-                    children[name] = child
-                    
+                if re.match('^' + path_regexes[0] + '$', name) and child.remove_path(path_regexes[1:]):
+                    continue
+
+                self.weight += child.weight
+                children[name] = child
+
             self.children = children
 
         # We ask again about the children
@@ -211,6 +207,15 @@ class PathNode:
         for child in self.children:
             self.children[child].print_tree(depth)
 
+    def size(self):
+        size = 0
+        if self.children:
+            for name, child in self.children.iteritems():
+                size += child.size()
+        else:
+            return 1
+        return size
+
 
 ''' ################################
         PUBLIC - OPAC CLASS
@@ -221,7 +226,7 @@ class OPaC:
         self.limit_per_filter_entry = 4
         self.paths = set([])
         self.filters = {}
-        self.tree = PathNode('')
+        self.tree = PathNode('', weight=0)
 
     def __iter__(self):
         return self
@@ -280,7 +285,7 @@ class OPaC:
         for _scrap in scrap:
             regexes = _scrap.get_regexes()
 
-            self.tree.remove_path([''] + regexes)
+            self.tree.remove_path(regexes)
 
             _sfilter =  '^/' + '/'.join(regexes) + '$'
 
