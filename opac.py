@@ -25,8 +25,8 @@ class Scrap:
 
         print '#'*20
 
-        for path in paths:
-            print path
+        #for path in paths:
+        #    print path
 
         _filter = ''
         for index in range(0, self.depth):
@@ -43,13 +43,6 @@ class Scrap:
             regexes.append(opac_regex.digest())
 
         return regexes
-
-
-    ''' Eliminamos todas las entradas del arbol que matcheen con el
-        filtro especificado.
-    '''
-    def clean(self, filter):
-
 
 
 ''' ################################
@@ -175,21 +168,31 @@ class PathNode:
 
         return node
 
-    '''
-
+    ''' Eliminamos todas las entradas del arbol que matcheen con el
+        filtro especificado.
     '''
     def remove_path(self, path_regexes):
-        if len(path_regexes) > 1:
+
+        # print '[RGX]({0}) - {1}'.format(self.name, path_regexes)
+
+        if not (path_regexes and re.match('^' + path_regexes[0] + '$', self.name)):
+            return False
+
+        if self.children:
             children = {}
-            for name, child in self.children:
-                if re.match('^' + path_regexes[1] + '$', name):
-                    child.remove_path(path_regexes[1:])
-                    if len(child.children) > 0:
-                        children[name] = child
+            for name, child in self.children.iteritems():
+                if child.remove_path(path_regexes[1:]):
+                    self.weight -= 1
                 else:
                     children[name] = child
-                
+                    
             self.children = children
+
+        # We ask again about the children
+        if not self.children:
+            return True
+
+        return False
 
     ''' #######################################################################
 
@@ -208,6 +211,7 @@ class PathNode:
         for child in self.children:
             self.children[child].print_tree(depth)
 
+
 ''' ################################
         PUBLIC - OPAC CLASS
     ################################
@@ -215,7 +219,7 @@ class PathNode:
 class OPaC:
     def __init__(self):
         self.limit_per_filter_entry = 4
-        self.paths = []
+        self.paths = set([])
         self.filters = {}
         self.tree = PathNode('')
 
@@ -232,15 +236,19 @@ class OPaC:
         return len(self.paths)
 
     def add_path(self, path):
+        if path in self.paths:
+            return
+
         spath = path.strip('/').split('/')
-        if spath and self.tree.add_path(spath):
+        if spath:
+            self.tree.add_path(spath)
             for _sfilter, (_cfilter, entries) in self.filters.iteritems():
                 if _cfilter.match(path):
                     if entries:
                         self.filters[_sfilter] = (_cfilter, entries - 1)
                         break
                     return
-            self.paths.append(path)
+            self.paths.add(path)
 
     ''' #######################################################################
         Obtenemos todos los nodos que tienen claras caracteristicas que los
@@ -272,7 +280,7 @@ class OPaC:
         for _scrap in scrap:
             regexes = _scrap.get_regexes()
 
-            self.tree.remove_path(regexes)
+            self.tree.remove_path([''] + regexes)
 
             _sfilter =  '^/' + '/'.join(regexes) + '$'
 

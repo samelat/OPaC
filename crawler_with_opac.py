@@ -37,18 +37,22 @@ for path in paths:
 begin = time.time()
 
 count = 0
+requests_count = 0
+last_size = 0
 for path in container:
 
 	uri = urlparse.urljoin(domain, path)
-	print '[URI] {0}'.format(uri)
+	requests_count += 1
+	print '[URI({0})] {1}'.format(requests_count, uri)
 
 	paths = get_paths(uri)
 	for path in paths:
 		container.add_path(path)
 
-	if container.size() > 200:
+	if (container.size() - last_size) > 200:
 		container.clean()
 		count = 0
+		last_size = container.size()
 	else:
 		count += 1
 
