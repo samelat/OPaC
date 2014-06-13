@@ -225,6 +225,7 @@ class OPaC:
     def __init__(self):
         self.limit_per_filter_entry = 4
         self.paths = set([])
+        self.saw_paths = set([])
         self.filters = {}
         self.tree = PathNode('', weight=0)
 
@@ -235,13 +236,15 @@ class OPaC:
         if not self.paths:
             raise StopIteration
         else:
-            return self.paths.pop(random.randint(0, len(self.paths) -1))
+            path = self.paths.pop()
+            self.saw_paths.add(path)
+            return path
 
     def size(self):
         return len(self.paths)
 
     def add_path(self, path):
-        if path in self.paths:
+        if (path in self.paths) or (path in self.saw_paths):
             return
 
         spath = path.strip('/').split('/')
@@ -306,5 +309,5 @@ class OPaC:
             #print survivor_paths
             survivor_paths = filter(lambda x: not bool(_cfilter.match(x)), survivor_paths)
 
-        self.paths = survivor_paths
+        self.paths = set(survivor_paths)
 
