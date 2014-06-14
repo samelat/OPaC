@@ -173,7 +173,7 @@ class OPaCRegex:
             else:
                 opac_regexes[regex_key] = opac_regex
 
-        print 'total = {0}'.format(len(self.entries))
+        # print 'total = {0}'.format(len(self.entries))
         performance = {'$.+^':0}
         best_regex = '$.+^'
         for key, node in opac_regexes.iteritems():
@@ -190,7 +190,7 @@ class OPaCRegex:
             if performance[best_regex] < performance[result]:
                 best_regex = result
 
-        print 'regex = {0} - {1}'.format(best_regex, performance[best_regex])
+        # print 'regex = {0} - {1}'.format(best_regex, performance[best_regex])
         return best_regex
             
 

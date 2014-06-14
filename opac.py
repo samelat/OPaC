@@ -23,7 +23,7 @@ class Scrap:
         regexes = []
         paths = self.node.paths_per_depth(self.depth)
 
-        print '#'*20
+        #print '#'*20
 
         #for path in paths:
         #    print path
@@ -241,7 +241,7 @@ class OPaC:
             return path
 
     def size(self):
-        return len(self.paths)
+        return self.tree.weight
 
     def add_path(self, path):
         if (path in self.paths) or (path in self.saw_paths):
