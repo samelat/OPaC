@@ -249,13 +249,13 @@ class OPaC:
 
         spath = path.strip('/').split('/')
         if spath:
-            self.tree.add_path(spath)
             for _sfilter, (_cfilter, entries) in self.filters.iteritems():
                 if _cfilter.match(path):
                     if entries:
                         self.filters[_sfilter] = (_cfilter, entries - 1)
                         break
                     return
+            self.tree.add_path(spath)
             self.paths.add(path)
 
     ''' #######################################################################
@@ -277,13 +277,6 @@ class OPaC:
             _scrap = node.get_scrap(weight_e + weight_devn)
             scrap.extend(_scrap)
 
-        '''
-            Cambiar las claves de self.filters por los strings, porque sino, cuando
-            busquemos si la regex ya esta creada, nunca la va a encontrar (todas las
-            instancias de re.compile son diferentes).
-            Meter todas las regex generadas por los scraps en una lista y estando
-            compiladas, recien ahi iterar la lista. Creo que puede ser mas eficiente.
-        '''
         survivor_paths = self.paths
         for _scrap in scrap:
             regexes = _scrap.get_regexes()
@@ -303,11 +296,20 @@ class OPaC:
 
             print _sfilter
             _cfilter = re.compile(_sfilter)
-            if _sfilter not in self.filters:
-                self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)
+            if _sfilter in self.filters:
+                print '[!!!] NOOOO {0}'.format(_sfilter)
+                continue
+
+            self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)
             print '------------------------------------------------------------'
             #print survivor_paths
-            survivor_paths = filter(lambda x: not bool(_cfilter.match(x)), survivor_paths)
+            _tmp = []
+            for path in survivor_paths:
+                if _cfilter.match(path):
+                    self.saw_paths.add(path)
+                else:
+                    _tmp.append(path)
+            survivor_paths = _tmp
 
         self.paths = set(survivor_paths)
 
