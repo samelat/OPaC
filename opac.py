@@ -27,9 +27,10 @@ class Scrap:
 
         #for path in paths:
         #    print path
+        print '[path0] {0}'.format(paths[0])
 
-        _filter = ''
-        for index in range(0, self.depth):
+        columns = []
+        for index in range(self.depth - 1, -1, -1):
             column = [path[index] for path in paths]
             entries = set(column)
 
@@ -40,8 +41,15 @@ class Scrap:
             # Armamos una expresion regular que contemple el mayor numero
             # de elementos en la columna
             opac_regex = OPaCRegex(list(entries))
-            regexes.append(opac_regex.digest())
+            regex = opac_regex.digest()
+            regexes.append(regex)
 
+            paths = [path for path in paths if re.match('^' + regex + '$', path[index])]
+
+        if '$.+^' in regexes:
+            print '[@@@@] {0}'.format(_paths)
+
+        regexes.reverse()
         return regexes
 
 
@@ -293,11 +301,12 @@ class OPaC:
             # 
             # print 'performance: {0}/{1}'.format(count, len(paths))
             ######################################
-
+            print regexes
             print _sfilter
             _cfilter = re.compile(_sfilter)
             if _sfilter in self.filters:
                 print '[!!!] NOOOO {0}'.format(_sfilter)
+                #_scrap.node.print_tree()
                 continue
 
             self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)

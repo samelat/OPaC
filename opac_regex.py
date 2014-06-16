@@ -190,6 +190,8 @@ class OPaCRegex:
             if performance[best_regex] < performance[result]:
                 best_regex = result
 
+        
+
         # print 'regex = {0} - {1}'.format(best_regex, performance[best_regex])
         return best_regex
             
