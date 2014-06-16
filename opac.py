@@ -15,42 +15,53 @@ class Scrap:
         self.depth  = depth
         self.weight = weight
 
+        self.regexes = []
+
     def __str__(self):
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
     def get_regexes(self):
 
-        regexes = []
         paths = self.node.paths_per_depth(self.depth)
 
         #print '#'*20
 
         #for path in paths:
         #    print path
-        print '[path0] {0}'.format(paths[0])
+        if not paths:
+            print '[ERROR] name: {0} - depth: {1}'.format(self.node.name, self.depth)
+            #self.node.print_tree()
+            1/0
 
-        columns = []
         for index in range(self.depth - 1, -1, -1):
             column = [path[index] for path in paths]
             entries = set(column)
 
             if len(entries) == 1:
-                regexes.append(entries.pop())
+                self.regexes.append(entries.pop())
                 continue
 
             # Armamos una expresion regular que contemple el mayor numero
             # de elementos en la columna
             opac_regex = OPaCRegex(list(entries))
             regex = opac_regex.digest()
-            regexes.append(regex)
+            self.regexes.append(regex)
 
             paths = [path for path in paths if re.match('^' + regex + '$', path[index])]
 
-        if '$.+^' in regexes:
-            print '[@@@@] {0}'.format(_paths)
+        #if '$.+^' in regexes:
+        #    print '[@@@@] {0}'.format(paths)
 
-        regexes.reverse()
-        return regexes
+        self.regexes.reverse()
+        return self.regexes
+
+    def clean(self):
+        if self.node.remove_path(self.regexes):
+            tmp = {}
+            for key, node in self.node.parent.children:
+                if not key == self.node.name:
+                    tmp[key] = node
+            self.node.parent.children = tmp
 
 
 ''' ################################
@@ -178,13 +189,16 @@ class PathNode:
 
         # print '[RGX]({0}) - {1}'.format(self.name, path_regexes)
         if not path_regexes:
-            return True
+            return False
 
-        if self.children:
+        if not re.match('^' + path_regexes[0] + '$', self.name):
+            return False
+
+        if self.children and (len(path_regexes) > 1):
             children = {}
             self.weight = 0
             for name, child in self.children.iteritems():
-                if re.match('^' + path_regexes[0] + '$', name) and child.remove_path(path_regexes[1:]):
+                if child.remove_path(path_regexes[1:]):
                     continue
 
                 self.weight += child.weight
@@ -285,11 +299,17 @@ class OPaC:
             _scrap = node.get_scrap(weight_e + weight_devn)
             scrap.extend(_scrap)
 
+        for _scrap in scrap:
+            print '[SCRAP] depth: {0}, root: {1}'.format(_scrap.depth, _scrap.node.name)
+
         survivor_paths = self.paths
         for _scrap in scrap:
-            regexes = _scrap.get_regexes()
+            try:
+                regexes = _scrap.get_regexes()
+            except:
+                raise ''
 
-            self.tree.remove_path(regexes)
+            _scrap.clean()
 
             _sfilter =  '^/' + '/'.join(regexes) + '$'
 
@@ -305,9 +325,9 @@ class OPaC:
             print _sfilter
             _cfilter = re.compile(_sfilter)
             if _sfilter in self.filters:
-                print '[!!!] NOOOO {0}'.format(_sfilter)
-                #_scrap.node.print_tree()
-                continue
+                print '[!!!] NOOOO {0} - depth: {1} - name: {2}'.format(_sfilter, _scrap.depth, _scrap.node.name)
+                _scrap.node.print_tree()
+                1/0
 
             self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)
             print '------------------------------------------------------------'
