@@ -26,8 +26,10 @@ class Scrap:
 
         #print '#'*20
 
-        #for path in paths:
-        #    print path
+        print '[PATHS]'
+        for path in paths:
+            print path
+
         if not paths:
             print '[ERROR] name: {0} - depth: {1}'.format(self.node.name, self.depth)
             #self.node.print_tree()
@@ -58,7 +60,7 @@ class Scrap:
     def clean(self):
         if self.node.remove_path(self.regexes):
             tmp = {}
-            for key, node in self.node.parent.children:
+            for key, node in self.node.parent.children.iteritems():
                 if not key == self.node.name:
                     tmp[key] = node
             self.node.parent.children = tmp
@@ -94,15 +96,16 @@ class PathNode:
 
 
     '''
-        Genera todos los paths existentes en el arbol para una profundidad
+        Genera todos los paths existentes en el arbol de una profundidad
         establecida.
     '''
     def paths_per_depth(self, depth, path=[]):
         _path = path + [self.name]
-        if self.depth == depth:
+
+        paths = []
+        if (self.depth == depth) and not self.children:
             paths = [_path]
-        else:
-            paths = []
+        elif self.depth < depth:
             for name, child in self.children.iteritems():
                 paths.extend(child.paths_per_depth(depth, _path))
 
@@ -133,6 +136,7 @@ class PathNode:
         scrap = []
 
         depths = self._weight_per_depth()
+        print '[DEPTHS] ({0}) - {1}'.format(self.name, depths)
         for depth, depth_weight in depths.iteritems():
             if depth_weight >= weight:
                 scrap.append(Scrap(self, depth, depth_weight))
@@ -269,13 +273,16 @@ class OPaC:
         if (path in self.paths) or (path in self.saw_paths):
             return
 
+        print '[PATH] "{0}"'.format(path)
+
         spath = path.strip('/').split('/')
         if spath:
             for _sfilter, (_cfilter, entries) in self.filters.iteritems():
                 if _cfilter.match(path):
                     if entries:
                         self.filters[_sfilter] = (_cfilter, entries - 1)
-                        break
+                        self.paths.add(path)
+                    print 'filtrado'
                     return
             self.tree.add_path(spath)
             self.paths.add(path)
@@ -309,9 +316,17 @@ class OPaC:
             except:
                 raise ''
 
-            _scrap.clean()
+            _sfilter =  '^/' + '/'.join(regexes) + '/?$'
 
-            _sfilter =  '^/' + '/'.join(regexes) + '$'
+            print regexes
+            print _sfilter
+            _cfilter = re.compile(_sfilter)
+            if _sfilter in self.filters:
+                print '[!!!] NOOOO {0} - depth: {1} - name: {2}'.format(_sfilter, _scrap.depth, _scrap.node.name)
+                _scrap.node.print_tree()
+                1/0
+
+            _scrap.clean()
 
             ################ DEBUG ###############
             # count = 0
@@ -321,13 +336,6 @@ class OPaC:
             # 
             # print 'performance: {0}/{1}'.format(count, len(paths))
             ######################################
-            print regexes
-            print _sfilter
-            _cfilter = re.compile(_sfilter)
-            if _sfilter in self.filters:
-                print '[!!!] NOOOO {0} - depth: {1} - name: {2}'.format(_sfilter, _scrap.depth, _scrap.node.name)
-                _scrap.node.print_tree()
-                1/0
 
             self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)
             print '------------------------------------------------------------'
