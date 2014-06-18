@@ -8,6 +8,7 @@ class OPaCRegexNode:
     def __init__(self, first_value):
         self.occurrences = [first_value]
 
+
     def quantifier(self):
         qs = list(set(self.occurrences))
         qs.sort()
@@ -21,12 +22,15 @@ class OPaCRegexNode:
         else:
             return '{{{0}}}'.format(qs[0])
 
+
     # Two nodes are equal if they have the same sign
     def __eq__(self, node):
         return self.key() == node.key()
 
+
     def __str__(self):
         return str(self.key())
+
 
 ''' ####################################
      PRIVATE - OPACREGEXINNERNODE CLASS
@@ -38,16 +42,20 @@ class OPaCRegexInnerNode(OPaCRegexNode):
         self.nodes = []
         self.nodes.extend(nodes)
 
+
     def add_node(self, node):
         self.nodes.append(node)
 
+
     def key(self):
         return tuple([n.key() for n in self.nodes])
+
 
     def fuse(self, node, way):
         self.occurrences = way(self.occurrences, node.occurrences)
         for i in range(0, len(self.nodes)):
             self.nodes[i].fuse(node.nodes[i], way)
+
 
     def render(self, wrapper=False):
         result = ''
@@ -75,8 +83,6 @@ class OPaCRegexInnerNode(OPaCRegexNode):
                 tail = chunks[-1]
                 chunks = chunks[:-1]
 
-            #print 'chunks: {0} - size: {1} - index: {2}'.format(len(chunks), size, index)
-
             #######################################################
             _nodes = [OPaCRegexInnerNode(chunk) for chunk in chunks]
 
@@ -99,7 +105,6 @@ class OPaCRegexInnerNode(OPaCRegexNode):
                 compressed.append(first_node)
             else:
                 compressed.extend(first_node.nodes)
-
             #######################################################
 
             compressed.extend(tail)
@@ -111,6 +116,7 @@ class OPaCRegexInnerNode(OPaCRegexNode):
             else:
                 index = 0
                 size += 1
+
 
 ''' ###################################
      PRIVATE - OPACREGEXLEAFNODE CLASS
@@ -130,6 +136,7 @@ class OPaCRegexLeafNode(OPaCRegexNode):
     def fuse(self, node, way):
         self.occurrences += node.occurrences
 
+
 ''' ##########################
      PUBLIC - OPACREGEX CLASS
     ##########################
@@ -144,7 +151,6 @@ class OPaCRegex:
         for entry in self.entries:
             elements = re.findall('(\d+|[^\W_]+|[\W_])', entry)
 
-            #print entry
             last_node = None
             opac_regex = OPaCRegexInnerNode()
             for element in elements:
@@ -163,9 +169,7 @@ class OPaCRegex:
                 last_node = node
                 opac_regex.add_node(node)
             
-            #print '*'*20
             opac_regex.compress()
-            #print '[+] compressed: {0}'.format(opac_regex)
             
             regex_key = opac_regex.key()
             if regex_key in opac_regexes:
@@ -173,7 +177,6 @@ class OPaCRegex:
             else:
                 opac_regexes[regex_key] = opac_regex
 
-        # print 'total = {0}'.format(len(self.entries))
         performance = {'$.+^':0}
         best_regex = '$.+^'
         for key, node in opac_regexes.iteritems():
@@ -190,9 +193,6 @@ class OPaCRegex:
             if performance[best_regex] < performance[result]:
                 best_regex = result
 
-        
-
-        # print 'regex = {0} - {1}'.format(best_regex, performance[best_regex])
         return best_regex
             
 

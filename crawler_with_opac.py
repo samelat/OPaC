@@ -58,21 +58,3 @@ for path in container:
 end = time.time()
 
 print 'seconds: {0}'.format(end - begin)
-
-'''
-fd = open(sys.argv[1], 'r')
-uris = fd.readlines()
-fd.close()
-
-paths = [urlparse.urlsplit(uri).path.strip() for uri in uris]
-
-opac = OPaC()
-for path in paths:
-    opac.add_path(path)
-
-first_len = len(opac.paths)
-opac.clean()
-last_len = len(opac.paths)
-
-print '{0}/{1}'.format(last_len, first_len)
-'''

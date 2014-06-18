@@ -20,20 +20,12 @@ class Scrap:
     def __str__(self):
         return '[{0}] {1} | {2}'.format(self.node.name, self.depth, self.weight)
 
+    '''
+        Generates the regexes that better match with the scrap branch (one regex per level)
+    '''
     def get_regexes(self):
 
         paths = self.node.paths_per_depth(self.depth)
-
-        #print '#'*20
-
-        print '[PATHS]'
-        for path in paths:
-            print path
-
-        if not paths:
-            print '[ERROR] name: {0} - depth: {1}'.format(self.node.name, self.depth)
-            #self.node.print_tree()
-            1/0
 
         for index in range(self.depth - 1, -1, -1):
             column = [path[index] for path in paths]
@@ -43,20 +35,19 @@ class Scrap:
                 self.regexes.append(entries.pop())
                 continue
 
-            # Armamos una expresion regular que contemple el mayor numero
-            # de elementos en la columna
+            # Here we make a regex that match with most of the column's elements
             opac_regex = OPaCRegex(list(entries))
             regex = opac_regex.digest()
             self.regexes.append(regex)
 
             paths = [path for path in paths if re.match('^' + regex + '$', path[index])]
 
-        #if '$.+^' in regexes:
-        #    print '[@@@@] {0}'.format(paths)
-
         self.regexes.reverse()
         return self.regexes
 
+    '''
+        Removes the branch's paths that match with the previous generated regexes
+    '''
     def clean(self):
         if self.node.remove_path(self.regexes):
             tmp = {}
@@ -81,9 +72,9 @@ class PathNode:
 
         self.same_depth = 0
 
-    ''' #######################################################################
-        Este metodo calcula la esperanza y la desviacion estandar con respecto
-        a los pesos de los nodos hijos.
+    '''
+        This method calculates the expectation and deviation respect the children
+        nodes' weights
     '''
     def distribution(self):
         weights  = [child.weight for name, child in self.children.iteritems()]
@@ -96,8 +87,7 @@ class PathNode:
 
 
     '''
-        Genera todos los paths existentes en el arbol de una profundidad
-        establecida.
+        Generates all the paths for an specified depth
     '''
     def paths_per_depth(self, depth, path=[]):
         _path = path + [self.name]
@@ -112,8 +102,8 @@ class PathNode:
         return paths
 
 
-    ''' #######################################################################
-        Devuelve el peso que hay para cada posible profundidad
+    '''
+        Returns the total weights for every depth in the branch
     '''
     def _weight_per_depth(self, depths={}):
         _depths = depths.copy()
@@ -129,14 +119,13 @@ class PathNode:
         return _depths
 
 
-    ''' #######################################################################
-        Devuelve una instancia de scrap por cada path que haya que suprimir
+    ''' 
+        Generates one Scrap instance for each branch that we have to process
     '''
     def get_scrap(self, weight):
         scrap = []
 
         depths = self._weight_per_depth()
-        print '[DEPTHS] ({0}) - {1}'.format(self.name, depths)
         for depth, depth_weight in depths.iteritems():
             if depth_weight >= weight:
                 scrap.append(Scrap(self, depth, depth_weight))
@@ -144,15 +133,15 @@ class PathNode:
         return scrap
 
 
-    ''' #######################################################################
-        Devuelve los nodos hijos cuyo peso es mayor al especificado
+    ''' 
+        Returns nodes that are heavier than the especified weight
     '''
     def heaviers(self, weight):
         return [child for name, child in self.children.iteritems() if child.weight > weight]
 
 
-    ''' #######################################################################
-        Add a new path into the tree.
+    '''
+        Adds a new path into the tree.
     '''
     def add_path(self, path):
 
@@ -168,30 +157,13 @@ class PathNode:
         if len(path) > 1:
             self.children[child_name].add_path(path[1:])
 
-    ''' #######################################################################
-        Obtenemos todo un subarbol, a partir de un path
+
     '''
-    def get_node(self, path):
-        subdirs = path.split('/')
-
-        node = self
-        for subdir in subdirs:
-            if subdir == self.name:
-                continue
-
-            if subdir in node.children:
-                node = node.children[subdir]
-            else:
-                break
-
-        return node
-
-    ''' Eliminamos todas las entradas del arbol que matcheen con el
-        filtro especificado.
+        Removes all the entries in the branch that match with the specified
+        list of regexes.
     '''
     def remove_path(self, path_regexes):
 
-        # print '[RGX]({0}) - {1}'.format(self.name, path_regexes)
         if not path_regexes:
             return False
 
@@ -216,14 +188,16 @@ class PathNode:
 
         return False
 
-    ''' #######################################################################
 
+    '''
+        Is the branch empty
     '''
     def is_empty(self):
         return not bool(self.children)
 
-    ''' #######################################################################
 
+    '''
+        Prints the tree. Just for debugging uses
     '''
     def print_tree(self, depth=-1):
         print "----|"*self.depth + self.name + "({0} - {1} #({2}))".format(self.depth,
@@ -232,15 +206,6 @@ class PathNode:
         
         for child in self.children:
             self.children[child].print_tree(depth)
-
-    def size(self):
-        size = 0
-        if self.children:
-            for name, child in self.children.iteritems():
-                size += child.size()
-        else:
-            return 1
-        return size
 
 
 ''' ################################
@@ -255,8 +220,10 @@ class OPaC:
         self.filters = {}
         self.tree = PathNode('', weight=0)
 
+
     def __iter__(self):
         return self
+
 
     def next(self):
         if not self.paths:
@@ -266,14 +233,14 @@ class OPaC:
             self.saw_paths.add(path)
             return path
 
+
     def size(self):
         return self.tree.weight
+
 
     def add_path(self, path):
         if (path in self.paths) or (path in self.saw_paths):
             return
-
-        print '[PATH] "{0}"'.format(path)
 
         spath = path.strip('/').split('/')
         if spath:
@@ -282,12 +249,12 @@ class OPaC:
                     if entries:
                         self.filters[_sfilter] = (_cfilter, entries - 1)
                         self.paths.add(path)
-                    print 'filtrado'
                     return
             self.tree.add_path(spath)
             self.paths.add(path)
 
-    ''' #######################################################################
+
+    '''
         Obtenemos todos los nodos que tienen claras caracteristicas que los
         hacen suprimibles.
     ''' 
@@ -296,8 +263,6 @@ class OPaC:
             return False
 
         weight_e, weight_devn = self.tree.distribution()
-
-        print '[!] esperanza: {0} - desviacion: {1}'.format(weight_e, weight_devn)
         
         heavy_nodes = self.tree.heaviers(weight_e + weight_devn)
 
@@ -306,40 +271,17 @@ class OPaC:
             _scrap = node.get_scrap(weight_e + weight_devn)
             scrap.extend(_scrap)
 
-        for _scrap in scrap:
-            print '[SCRAP] depth: {0}, root: {1}'.format(_scrap.depth, _scrap.node.name)
-
         survivor_paths = self.paths
         for _scrap in scrap:
-            try:
-                regexes = _scrap.get_regexes()
-            except:
-                raise ''
+            regexes = _scrap.get_regexes()
 
             _sfilter =  '^/' + '/'.join(regexes) + '/?$'
 
-            print regexes
-            print _sfilter
             _cfilter = re.compile(_sfilter)
-            if _sfilter in self.filters:
-                print '[!!!] NOOOO {0} - depth: {1} - name: {2}'.format(_sfilter, _scrap.depth, _scrap.node.name)
-                _scrap.node.print_tree()
-                1/0
 
             _scrap.clean()
 
-            ################ DEBUG ###############
-            # count = 0
-            # for path in paths:
-            #     if re.match(_filter, '/'.join(path)):
-            #         count += 1
-            # 
-            # print 'performance: {0}/{1}'.format(count, len(paths))
-            ######################################
-
             self.filters[_sfilter] = (_cfilter, self.limit_per_filter_entry)
-            print '------------------------------------------------------------'
-            #print survivor_paths
             _tmp = []
             for path in survivor_paths:
                 if _cfilter.match(path):
