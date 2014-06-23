@@ -219,7 +219,10 @@ class OPaC:
         self.tree = PathNode('', weight=0)
 
         self.previous_weight = 0
-        self.trigger_weight = 100
+        self.trigger_weight  = 30
+
+        self.takenA = 0
+        self.takenB = 0
 
 
     def __iter__(self):
@@ -232,6 +235,7 @@ class OPaC:
         else:
             path = self.paths.pop()
             self.saw_paths.add(path)
+            self.takenA += 1
             return path
 
 
@@ -241,7 +245,7 @@ class OPaC:
 
     def add_path(self, path):
         if (path in self.paths) or (path in self.saw_paths):
-            return
+            return False
 
         spath = path.strip('/').split('/')
         if spath:
@@ -250,9 +254,13 @@ class OPaC:
                     if entries:
                         self.filters[_sfilter] = (_cfilter, entries - 1)
                         self.paths.add(path)
-                    return
+                        return True
+                    return False
             self.tree.add_path(spath)
             self.paths.add(path)
+            return True
+
+        return False
 
     '''
 
@@ -268,11 +276,21 @@ class OPaC:
             self.clean()
             self.previous_weight = self.size()
 
-            print '[WEIGHTS] Trigg: {0} - Act: {1} - Post: {2}'.format(self.trigger_weight,
-                                                                       now,
-                                                                       self.previous_weight)
+            direct = '^'
+            if self.takenA <= self.takenB:
+                self.trigger_weight += 30
+            else:
+                direct = 'v'
 
-            self.trigger_weight = self.size() + 70
+            print '[WEIGHTS] Trigg: {0} - Act: {1} - Post: {2} - Taken: {3}'.format(self.trigger_weight,
+                                                                       now,
+                                                                       self.previous_weight,
+                                                                       direct)
+
+            self.trigger_weight = self.size() + 30
+
+            self.takenB = self.takenA
+            self.takenA = 0
 
 
     '''

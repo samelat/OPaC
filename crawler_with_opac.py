@@ -46,9 +46,12 @@ last_size = 0
 for path in container:
 
 	uri = urlparse.urljoin(domain, path)
+	if domain not in uri:
+		continue
+
 	requests_count += 1
 
-	#print '[URI({0})] {1}'.format(requests_count, uri)
+	print '[URI({0})] {1}'.format(requests_count, uri)
 
 	paths = get_paths(uri)
 	
