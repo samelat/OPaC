@@ -51,9 +51,11 @@ class Scrap:
     def clean(self):
         if self.node.remove_path(self.regexes):
             tmp = {}
+            self.node.parent.weight = 0
             for key, node in self.node.parent.children.iteritems():
                 if not key == self.node.name:
                     tmp[key] = node
+                    self.node.parent.weight += node.weight
             self.node.parent.children = tmp
 
 
@@ -167,23 +169,19 @@ class PathNode:
         if not path_regexes:
             return False
 
-        if not re.match('^' + path_regexes[0] + '$', self.name):
-            return False
+        if re.match('^' + path_regexes[0] + '$', self.name):
 
-        if self.children and (len(path_regexes) > 1):
-            children = {}
-            self.weight = 0
-            for name, child in self.children.iteritems():
-                if child.remove_path(path_regexes[1:]):
-                    continue
+            if self.children and (len(path_regexes) > 1):
+                children = {}
+                self.weight = 0
+                for name, child in self.children.iteritems():
+                    if child.remove_path(path_regexes[1:]) and not child.children:
+                        continue
 
-                self.weight += child.weight
-                children[name] = child
+                    self.weight += child.weight
+                    children[name] = child
 
-            self.children = children
-
-        # We ask again about the children
-        if not self.children:
+                self.children = children
             return True
 
         return False
@@ -220,6 +218,9 @@ class OPaC:
         self.filters = {}
         self.tree = PathNode('', weight=0)
 
+        self.previous_weight = 0
+        self.trigger_weight = 100
+
 
     def __iter__(self):
         return self
@@ -253,6 +254,26 @@ class OPaC:
             self.tree.add_path(spath)
             self.paths.add(path)
 
+    '''
+
+    '''
+    def update(self, paths):
+
+        for path in paths:
+            self.add_path(path)
+
+        if self.size() > self.trigger_weight:
+
+            now = self.size()
+            self.clean()
+            self.previous_weight = self.size()
+
+            print '[WEIGHTS] Trigg: {0} - Act: {1} - Post: {2}'.format(self.trigger_weight,
+                                                                       now,
+                                                                       self.previous_weight)
+
+            self.trigger_weight = self.size() + 70
+
 
     '''
         Obtenemos todos los nodos que tienen claras caracteristicas que los
@@ -278,6 +299,8 @@ class OPaC:
             _sfilter =  '^/' + '/'.join(regexes) + '/?$'
 
             _cfilter = re.compile(_sfilter)
+
+            #print _sfilter
 
             _scrap.clean()
 

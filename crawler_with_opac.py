@@ -25,8 +25,11 @@ def get_paths(uri):
 			_uri = urlparse.urljoin(uri, href)
 
 			paths.append(urllib.quote(urlparse.urlsplit(_uri).path))
+	except KeyboardInterrupt:
+		sys.exit()
 	except:
 		return []
+
 	return paths
 
 container = OPaC()
@@ -39,21 +42,17 @@ begin = time.time()
 count = 0
 requests_count = 0
 last_size = 0
+
 for path in container:
 
 	uri = urlparse.urljoin(domain, path)
 	requests_count += 1
-	print '[URI({0})({2})] {1}'.format(requests_count, uri, (container.size() - last_size))
+
+	#print '[URI({0})] {1}'.format(requests_count, uri)
 
 	paths = get_paths(uri)
-	for path in paths:
-		container.add_path(path)
-
-	if (container.size() - last_size) > 100:
-		container.clean()
-		last_size = container.size()
-	else:
-		count += 1
+	
+	container.update(paths)
 
 end = time.time()
 
