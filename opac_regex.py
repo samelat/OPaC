@@ -177,21 +177,23 @@ class OPaCRegex:
             else:
                 opac_regexes[regex_key] = opac_regex
 
+            print(regex_key)
+
         performance = {'$.+^':0}
         best_regex = '$.+^'
-        for key, node in opac_regexes.iteritems():
+        for key, node in opac_regexes.items():
 
-            result = node.render()
+            regex = node.render()
 
-            if result not in performance:
-                performance[result] = 0
+            if regex not in performance:
+                performance[regex] = 0
             
             for entry in self.entries:
-                if re.match('^' + result + '$', entry):
-                    performance[result] += 1
+                if re.match('^' + regex + '$', entry):
+                    performance[regex] += 1
 
-            if performance[best_regex] < performance[result]:
-                best_regex = result
+            if performance[best_regex] < performance[regex]:
+                best_regex = regex
 
         return best_regex
             
