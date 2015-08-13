@@ -1,35 +1,201 @@
 import re
 
+''' ###############################
+     PRIVATE - OPACREGEXNODE CLASS
+    ###############################
+'''
+class OPaCRegexNode:
+    def __init__(self, first_value):
+        self.occurrences = [first_value]
 
 
+    def quantifier(self):
+        qs = list(set(self.occurrences))
+        qs.sort()
+        weight = len(qs)
+        if weight > 2:
+            return '+'
+        elif weight == 2:
+            return '{{{0},{1}}}'.format(qs[0], qs[1])
+        elif qs[0] == 1:
+            return ''
+        else:
+            return '{{{0}}}'.format(qs[0])
+
+
+    # Two nodes are equal if they have the same sign
+    def __eq__(self, node):
+        return self.key() == node.key()
+
+
+    def __str__(self):
+        return str(self.key())
+
+
+''' ####################################
+     PRIVATE - OPACREGEXINNERNODE CLASS
+    ####################################
+'''
+class OPaCRegexInnerNode(OPaCRegexNode):
+    def __init__(self, nodes=[]):
+        OPaCRegexNode.__init__(self, 1)
+        self.nodes = []
+        self.nodes.extend(nodes)
+
+
+    def add_node(self, node):
+        self.nodes.append(node)
+
+
+    def key(self):
+        return tuple([node.key() for node in self.nodes])
+
+
+    def fuse(self, node, way):
+        self.occurrences = way(self.occurrences, node.occurrences)
+        for i in range(0, len(self.nodes)):
+            self.nodes[i].fuse(node.nodes[i], way)
+
+
+    def render(self, wrapper=False):
+        result = ''
+        if wrapper:
+            result = '('
+
+        for node in self.nodes:
+            result += node.render(True)
+
+        if wrapper:
+            result += ')' + self.quantifier()
+
+        return result
+
+
+    def compress(self):
+        size = 2
+        index = 0
+        while (len(self.nodes)/size) > 1:
+
+            chunks = [self.nodes[i:i+size] for i in range(index, len(self.nodes), size)]
+
+            tail = []
+            if len(chunks[-1]) != size:
+                tail = chunks[-1]
+                chunks = chunks[:-1]
+
+            #######################################################
+            _nodes = [OPaCRegexInnerNode(chunk) for chunk in chunks]
+
+            first_node = _nodes[0]
+            compressed = self.nodes[:index]
+            merging = False
+            for node in _nodes[1:]:
+                if first_node == node:
+                    first_node.fuse(node, lambda l1, l2 : [l1[0] + l2[0]])
+                    merging = True
+                else:
+                    if merging:
+                        compressed.append(first_node)
+                    else:
+                        compressed.extend(first_node.nodes)
+                    merging = False
+                    first_node = node
+
+            if merging:
+                compressed.append(first_node)
+            else:
+                compressed.extend(first_node.nodes)
+            #######################################################
+
+            compressed.extend(tail)
+
+            if len(self.nodes) > len(compressed):
+                self.nodes = compressed
+            elif len(self.nodes) >= (index + 2*size):
+                index += 1
+            else:
+                index = 0
+                size += 1
+
+
+''' ###################################
+     PRIVATE - OPACREGEXLEAFNODE CLASS
+    ###################################
+'''
+class OPaCRegexLeafNode(OPaCRegexNode):
+    def __init__(self, value, length):
+        OPaCRegexNode.__init__(self, length)
+        self.value = value
+
+    def key(self):
+        return self.value
+
+    def render(self, outer=True):
+        return self.value + self.quantifier()
+
+    def fuse(self, node, way):
+        self.occurrences += node.occurrences
+
+
+''' ##########################
+     PUBLIC - OPACREGEX CLASS
+    ##########################
+'''
 class OPaCRegex:
-
-    def __init__(self, rows):
-        self.rows = rows
-
-
-    def words_to_regexes(self, words):
-        pass
-
+    def __init__(self, entries):
+        self.entries = entries
+        self.tree = None
 
     def digest(self):
+        opac_regexes = {}
+        for entry in self.entries:
+            elements = re.findall('(\d+|[^\W_]+|[\W_])', entry)
 
-        tokens_stacks = []
-        for row in self.rows:
-            tokens = re.findall('(\d+|[^\W_]+|[\W_])', row)
-            tokens_stacks.append(tokens)
+            last_node = None
+            opac_regex = OPaCRegexInnerNode()
+            for element in elements:
+                first_c = element[0]
+                if re.match('\d', first_c):
+                    node = OPaCRegexLeafNode('\d', len(element))
 
-        regex_stacks = [[]]
-        while tokens_stacks:
-            tokens = set()
-            new_tokens_stacks = []
-            for tokens_stack in tokens_stacks:
-                tokens.add(tokens_stack.pop(0))
-                if tokens_stack:
-                    new_tokens_stacks.append(tokens_stack)
-            tokens_stacks = new_tokens_stacks
+                elif re.match('[^\W_]', first_c):
+                    node = OPaCRegexLeafNode('[^\W_]', len(element))
 
-            print(tokens)
+                else:
+                    node = OPaCRegexLeafNode('\\' + first_c, 1)
+                    if last_node and (last_node == node):
+                        last_node.fuse(node, lambda l1, l2 : [l1[0] + l2[0]])
+                        continue
+                last_node = node
+                opac_regex.add_node(node)
+            
+            opac_regex.compress()
+            
+            regex_key = opac_regex.key()
+            if regex_key in opac_regexes:
+                opac_regexes[regex_key].fuse(opac_regex, lambda l1, l2: l1 + l2)
+            else:
+                opac_regexes[regex_key] = opac_regex
 
-            if len(tokens) == 1:
+            print(regex_key)
+
+        performance = {'$.+^':0}
+        best_regex = '$.+^'
+        for key, node in opac_regexes.items():
+
+            regex = node.render()
+
+            if regex not in performance:
+                performance[regex] = 0
+            
+            for entry in self.entries:
+                if re.match('^' + regex + '$', entry):
+                    performance[regex] += 1
+
+            if performance[best_regex] < performance[regex]:
+                best_regex = regex
+
+        return best_regex
+            
+
 
