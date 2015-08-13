@@ -8,6 +8,4 @@ kwords = [
 ]
 
 oregex = OPaCRegex(kwords)
-regex = oregex.digest()
-
-print(regex)
+oregex.digest()
