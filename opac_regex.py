@@ -1,201 +1,208 @@
 import re
 
-''' ###############################
-     PRIVATE - OPACREGEXNODE CLASS
-    ###############################
-'''
-class OPaCRegexNode:
-    def __init__(self, first_value):
-        self.occurrences = [first_value]
+class OPaCRegex:
+    def __init__(self, entries):
+        self.entries = {}
+        for entry in entries:
+            self.entries[entry] = {}
 
+    def fragment(self, groups):
+        result = []
+        sizes = []
 
-    def quantifier(self):
-        qs = list(set(self.occurrences))
-        qs.sort()
-        weight = len(qs)
-        if weight > 2:
-            return '+'
-        elif weight == 2:
-            return '{{{0},{1}}}'.format(qs[0], qs[1])
-        elif qs[0] == 1:
-            return ''
-        else:
-            return '{{{0}}}'.format(qs[0])
+        last_group = groups.pop(0)
+        while groups:
+            group = groups.pop(0)
 
+            intersection_size = 0
+            for size in range(1, min(len(last_group), len(group)) + 1):
+                if last_group[-1*size:] == group[:size]:
+                    intersection_size = size
+                    break
 
-    # Two nodes are equal if they have the same sign
-    def __eq__(self, node):
-        return self.key() == node.key()
+            if intersection_size:
+                fragments = [last_group[:-1*intersection_size],
+                             last_group[ -1*intersection_size:],
+                             group[:intersection_size],
+                             group[intersection_size:]]
+                fragments = [group for group in fragments if group]
 
+                last_group = fragments.pop()
+                result.extend(fragments)
 
-    def __str__(self):
-        return str(self.key())
+            else:
+                result.append(last_group)
+                last_group = group
 
-
-''' ####################################
-     PRIVATE - OPACREGEXINNERNODE CLASS
-    ####################################
-'''
-class OPaCRegexInnerNode(OPaCRegexNode):
-    def __init__(self, nodes=[]):
-        OPaCRegexNode.__init__(self, 1)
-        self.nodes = []
-        self.nodes.extend(nodes)
-
-
-    def add_node(self, node):
-        self.nodes.append(node)
-
-
-    def key(self):
-        return tuple([node.key() for node in self.nodes])
-
-
-    def fuse(self, node, way):
-        self.occurrences = way(self.occurrences, node.occurrences)
-        for i in range(0, len(self.nodes)):
-            self.nodes[i].fuse(node.nodes[i], way)
-
-
-    def render(self, wrapper=False):
-        result = ''
-        if wrapper:
-            result = '('
-
-        for node in self.nodes:
-            result += node.render(True)
-
-        if wrapper:
-            result += ')' + self.quantifier()
+        result.append(last_group)
 
         return result
 
 
-    def compress(self):
-        size = 2
-        index = 0
-        while (len(self.nodes)/size) > 1:
+    def compress(self, groups):
+        result = []
+        sizes = []
 
-            chunks = [self.nodes[i:i+size] for i in range(index, len(self.nodes), size)]
-
-            tail = []
-            if len(chunks[-1]) != size:
-                tail = chunks[-1]
-                chunks = chunks[:-1]
-
-            #######################################################
-            _nodes = [OPaCRegexInnerNode(chunk) for chunk in chunks]
-
-            first_node = _nodes[0]
-            compressed = self.nodes[:index]
-            merging = False
-            for node in _nodes[1:]:
-                if first_node == node:
-                    first_node.fuse(node, lambda l1, l2 : [l1[0] + l2[0]])
-                    merging = True
-                else:
-                    if merging:
-                        compressed.append(first_node)
-                    else:
-                        compressed.extend(first_node.nodes)
-                    merging = False
-                    first_node = node
-
-            if merging:
-                compressed.append(first_node)
+        group_size = 1
+        last_group = groups.pop(0)
+        while groups:
+            group = groups.pop(0)
+            if last_group == group:
+                group_size += 1
             else:
-                compressed.extend(first_node.nodes)
-            #######################################################
+                result.append(last_group)
+                sizes.append(group_size)
+                last_group = group
+                group_size = 1
 
-            compressed.extend(tail)
+        sizes.append(group_size)
+        result.append(last_group)
 
-            if len(self.nodes) > len(compressed):
-                self.nodes = compressed
-            elif len(self.nodes) >= (index + 2*size):
-                index += 1
+        return result, sizes
+
+
+    def group_tokens(self, sizes, tokens):
+        result = []
+        last_index = 0
+        for height, weight in sizes:
+            row = []
+            for index in range(last_index, last_index + height*weight, weight):
+                entry = ''.join(tokens[index:index+weight])
+                row.append(entry)
+
+                last_index = index + weight
+
+            result.append(row)
+
+        return result
+
+
+    def template(self, tokens):
+
+        group = []
+        template = []
+        for token in tokens:
+            if re.match('\d', token[0]):
+                regex_token = '\d'
+
+            elif re.match('[^\W_]', token[0]):
+                regex_token = '[^\W_]'
+
             else:
-                index = 0
-                size += 1
+                regex_token = '\\' + token[0]
+
+            if regex_token in group:
+                template.append(tuple(group))
+                group = []
+            
+            group.append(regex_token)
+
+        template.append(tuple(group))
+        return template
 
 
-''' ###################################
-     PRIVATE - OPACREGEXLEAFNODE CLASS
-    ###################################
-'''
-class OPaCRegexLeafNode(OPaCRegexNode):
-    def __init__(self, value, length):
-        OPaCRegexNode.__init__(self, length)
-        self.value = value
+    def sharpen(self, template):
+        match_entries = [entry for entry in self.entries.values() if entry['template'] == template]
 
-    def key(self):
-        return self.value
+        groups_heights = [entry['heights'] for entry in match_entries]
+        groups_heights_union = [set([height]) for height in groups_heights.pop()]
+        for height_index in range(0, len(groups_heights_union)):
+            groups_heights_union[height_index].update([heights[height_index] for heights in groups_heights])
 
-    def render(self, outer=True):
-        return self.value + self.quantifier()
+        grouped_tokens = [entry['grouped_tokens'] for entry in match_entries]
+        grouped_tokens_union = [set(tokens_group) for tokens_group in grouped_tokens.pop()]
+        
+        for group_index in range(0, len(grouped_tokens_union)):
+            for tokens_group in grouped_tokens:
+                grouped_tokens_union[group_index] = grouped_tokens_union[group_index].intersection(tokens_group[group_index])
 
-    def fuse(self, node, way):
-        self.occurrences += node.occurrences
+        sharped_heights = []
+        sharped_template = []
+        for group_index in range(0, len(grouped_tokens_union)):
+            if grouped_tokens_union[group_index]:
+                tokens_group = [token for token in grouped_tokens[0][group_index]
+                                      if  token in grouped_tokens_union[group_index]]
+                for token in tokens_group:
+                    sharped_heights.append({1})
+                    sharped_template.append((token,))
+                    sharped_template.append(template[group_index])
+
+                    updated_heights = set([height-1 for height in groups_heights_union[group_index]])
+                    sharped_heights.append(updated_heights)
+
+            else:
+                sharped_heights.append(groups_heights_union[group_index])
+                sharped_template.append(template[group_index])
+
+        print(sharped_template)
+        print(sharped_heights)
+
+        return (sharped_template, sharped_heights)
 
 
-''' ##########################
-     PUBLIC - OPACREGEX CLASS
-    ##########################
-'''
-class OPaCRegex:
-    def __init__(self, entries):
-        self.entries = entries
-        self.tree = None
+    def compile(self, template, heights):
+
+        regex = ''
+        for group_index in range(0, len(template)):
+            group = template[group_index]
+            group_regex = ''
+            for token in group:
+                group_regex += token
+                if token in ['[^\\W_]', '\\d']:
+                    group_regex += '+'
+
+            group_heights = heights[group_index]
+
+            if len(group_heights) == 1:
+                height = group_heights.pop()
+                if not height:
+                    continue
+
+                regex += group_regex
+                if height > 1:
+                    regex += '{{{0}}}'.format(*group_heights)
+
+            elif len(group_heights) == 2:
+                regex += '({0})'.format(group_regex)
+                regex += '{{{0},{1}}}'.format(*group_heights)
+
+            else:
+                regex += '({0})'.format(group_regex)
+                regex += '+'
+
+        return regex
+
 
     def digest(self):
-        opac_regexes = {}
+
+        templates = {}
         for entry in self.entries:
-            elements = re.findall('(\d+|[^\W_]+|[\W_])', entry)
+            tokens = re.findall('(\d+|[^\W_]+|[\W_])', entry)
 
-            last_node = None
-            opac_regex = OPaCRegexInnerNode()
-            for element in elements:
-                first_c = element[0]
-                if re.match('\d', first_c):
-                    node = OPaCRegexLeafNode('\d', len(element))
+            template = self.template(tokens)
+            template = self.fragment(template)
+            template, heights = self.compress(template)
 
-                elif re.match('[^\W_]', first_c):
-                    node = OPaCRegexLeafNode('[^\W_]', len(element))
+            # El template tendria que ser como el Identificador del proceso
+            # que se esta haciendo, entonces en group_tokens, solo se deberia
+            # especificar los tokens y el template (las unicas 2 cosas que se
+            # necesitan :) ).
+            weights = [len(group) for group in template]
+            grouped_tokens = self.group_tokens(list(zip(heights, weights)), tokens)
+            self.entries[entry]['grouped_tokens'] = grouped_tokens
+            self.entries[entry]['heights'] = heights
 
-                else:
-                    node = OPaCRegexLeafNode('\\' + first_c, 1)
-                    if last_node and (last_node == node):
-                        last_node.fuse(node, lambda l1, l2 : [l1[0] + l2[0]])
-                        continue
-                last_node = node
-                opac_regex.add_node(node)
-            
-            opac_regex.compress()
-            
-            regex_key = opac_regex.key()
-            if regex_key in opac_regexes:
-                opac_regexes[regex_key].fuse(opac_regex, lambda l1, l2: l1 + l2)
-            else:
-                opac_regexes[regex_key] = opac_regex
+            template = tuple(template)
+            self.entries[entry]['template'] = template
 
-            print(regex_key)
+            if template not in templates:
+                templates[template] = 0
+            templates[template] += 1
 
-        performance = {'$.+^':0}
-        best_regex = '$.+^'
-        for key, node in opac_regexes.items():
+        sorted_templates = [(value, template) for template,value in templates.items()]
+        sorted_templates.sort(reverse=True)
+        best_template = sorted_templates[0][1]
 
-            regex = node.render()
+        sharped_template, sharped_heights = self.sharpen(best_template)
 
-            if regex not in performance:
-                performance[regex] = 0
-            
-            for entry in self.entries:
-                if re.match('^' + regex + '$', entry):
-                    performance[regex] += 1
-
-            if performance[best_regex] < performance[regex]:
-                best_regex = regex
-
-        return best_regex
-            
-
-
+        return self.compile(sharped_template, sharped_heights)
