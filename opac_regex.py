@@ -105,15 +105,14 @@ class OPaCRegex:
         match_entries = [entry for entry in self.entries.values() if entry['template'] == template]
 
         groups_heights = [entry['heights'] for entry in match_entries]
-        groups_heights_union = [set([height]) for height in groups_heights.pop()]
+        groups_heights_union = [set([height]) for height in groups_heights[0]]
         for height_index in range(0, len(groups_heights_union)):
-            groups_heights_union[height_index].update([heights[height_index] for heights in groups_heights])
+            groups_heights_union[height_index].update([heights[height_index] for heights in groups_heights[1:]])
 
         grouped_tokens = [entry['grouped_tokens'] for entry in match_entries]
-        grouped_tokens_union = [set(tokens_group) for tokens_group in grouped_tokens.pop()]
-        
-        for group_index in range(0, len(grouped_tokens_union)):
-            for tokens_group in grouped_tokens:
+        grouped_tokens_union = [set(tokens_group) for tokens_group in grouped_tokens[0]]
+        for tokens_group in grouped_tokens[1:]:
+            for group_index in range(0, len(grouped_tokens_union)):
                 grouped_tokens_union[group_index] = grouped_tokens_union[group_index].intersection(tokens_group[group_index])
 
         sharped_heights = []
@@ -133,9 +132,6 @@ class OPaCRegex:
             else:
                 sharped_heights.append(groups_heights_union[group_index])
                 sharped_template.append(template[group_index])
-
-        print(sharped_template)
-        print(sharped_heights)
 
         return (sharped_template, sharped_heights)
 
@@ -160,11 +156,13 @@ class OPaCRegex:
 
                 regex += group_regex
                 if height > 1:
-                    regex += '{{{0}}}'.format(*group_heights)
+                    regex += '{{{0}}}'.format(height)
 
             elif len(group_heights) == 2:
                 regex += '({0})'.format(group_regex)
-                regex += '{{{0},{1}}}'.format(*group_heights)
+                group_range = list(group_heights)
+                group_range.sort()
+                regex += '{{{0},{1}}}'.format(*group_range)
 
             else:
                 regex += '({0})'.format(group_regex)
