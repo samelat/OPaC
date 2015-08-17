@@ -2,7 +2,7 @@
 import string
 import random
 
-from path_tree import PathNode
+from opac_tree import PathNode
 
 
 ''' ################################
@@ -37,18 +37,20 @@ class OPaC:
 
 
     def add_path(self, path):
-        if (path in self.paths) or (path in self.saw_paths):
-            return False
+        #if (path in self.paths) or (path in self.saw_paths):
+        #    return False
 
-        spath = path.strip('/').split('/')
-        if spath:
-            # "remaining" is the number of matches we allow to exist per regex
-            # before deny all of them.
+        path = path.strip('/')
+        if path:
+            spath = path.split('/')
+
+            #if ('printmail' not in spath) or ('materias' not in spath):
+            #    return
 
             depth = len(spath)
 
             if depth not in self.trees:
-                self.trees[depth] = PathNode('', weight=0)
+                self.trees[depth] = PathNode('')
 
             self.trees[depth].add_path(spath)
 
