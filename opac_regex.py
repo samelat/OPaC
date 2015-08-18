@@ -29,55 +29,74 @@ class OPaCRegex:
         best_template = sorted_templates[0][1]
         self.samples = templates[best_template]
 
-        template = Template(best_template, self.samples)
+        template = []
+        for group_index in range(0, len(best_template)):
+            group = RegexGroup(best_template[group_index], group_index)
+            for sample in self.samples:
+                group.use_sample(sample)
+            template.append(group)
 
-        template.sharpen()
-        #return template.compile()
+        regex = ''
+        #for group in template:
+        #    group.sharpen()
+        #    regex += group.compile()
+        print(template[0].heights)
+        print(template[0].cardinalities)
+        print(template[0].prefix)
+        print(template[0].postfix)
+
+        print(best_template)
+
+        return regex
 
 
 ''' ##############################################################
 
     ##############################################################
 '''
-class Template:
-    def __init__(self, template, samples):
-        self.samples = samples
+class RegexGroup:
+    def __init__(self, template, index):
+        self.index = index
         self.template = template
+        self.heights = set()
+        self.cardinalities = []
+        for token_regex in self.template:
+            self.cardinalities.append(set())
+        self.prefix = None
+        self.postfix = None
+
+
+    def use_sample(self, sample):
+
+        group_samples = sample.group(self.index)
+        self.heights.add(sample.heights[self.index])
+
+        group_sets = []
+        for token_index in range(0, len(self.template)):
+            token_set = set()
+            for group_sample in group_samples:
+                self.cardinalities[token_index].add(len(group_sample[token_index]))
+                token_set.add(group_sample[token_index])
+            group_sets.append(token_set)
+
+        if not self.prefix:
+            self.prefix = [{token} for token in group_samples[0]]
+        else:
+            for group_index in range(0, len(self.postfix)):
+                self.prefix[group_index] = self.prefix[group_index].intersection(group_samples[0][group_index])
+
+        if not self.postfix:
+            self.postfix = [{token} for token in group_samples[-1]]
+        else:
+            for group_index in range(0, len(self.postfix)):
+                self.postfix[group_index] = self.postfix[group_index].intersection(group_samples[-1][group_index])
+
 
     def sharpen(self):
 
-        #heights = [sample.heights for sample in self.samples]
-        heights_union = [set([height]) for height in self.samples[0].heights]
-
-        for height_index in range(0, len(heights_union)):
-            heights_union[height_index].update([sample.heights[height_index] for sample in self.samples[1:]])
-
-
-
-        #grouped_tokens_union = [set(token) for token in self.samples[0].group_tokens()]
-        samples_grouped_tokens = [sample.group_tokens() for sample in self.samples]
-
-        for grouped_tokens in samples_group_tokens:
-            for tokens_group in grouped_tokens:
-
-        print(all_grouped_tokens[0])
-
-        grouped_tokens_union = []
-        for group_index in range(0, len(self.template)):
-            group_union = []
-            for token_index in range(0, len(self.template[group_index])):
-                for grouped_tokens in all_grouped_tokens
-                tokens_union = set([grouped_tokens[group_index][token_index] ])
-                group_union.append(tokens_union)
-            grouped_tokens_union.append(group_union)
-
-        print(grouped_tokens_union)
-
-        return
-
         sharped_heights = []
         sharped_template = []
-        for group_index in range(0, len(grouped_tokens_union)):
+        for group_index in range(0, len(self.template)):
             if grouped_tokens_union[group_index]:
                 tokens_group = [token for token in grouped_tokens[0][group_index]
                                       if  token in grouped_tokens_union[group_index]]
@@ -142,28 +161,27 @@ class Template:
 class Sample:
 
     def __init__(self, sample):
-        self.tokens = re.findall('([^\W_]+|[\W_])', sample)
+        self.tokens = re.findall('([^\W_]+|[\W_]+)', sample)
         template = self.digest_tokens()
         template = self.fragment(template)
         self.template, self.heights = self.compress(template)
+        self.weights = [len(group) for group in self.template]
 
     def __hash__(self):
         return hash(tuple(self.template))
 
-    def group_tokens(self):
-        weights = [len(group) for group in self.template]
+    def group(self, group_index):
+        samples = []
 
-        result = []
-        last_index = 0
-        for height, weight in zip(self.heights, weights):
-            group = []
-            for index in range(last_index, last_index + height*weight, weight):
-                row.append(self.tokens[index:index+weight])
+        weight = self.weights[group_index]
+        height = self.heights[group_index]
+        last_index = sum([self.weights[index]*self.heights[index] for index in range(0, group_index)])
+        for token_index in range(last_index, last_index + height*weight, weight):
+            samples.append(self.tokens[token_index:token_index+weight])
 
-                last_index = index + weight
+            last_token_index = token_index + weight
 
-            result.append(group)
-        return result
+        return samples
 
     def digest_tokens(self):
         regexes = []
