@@ -8,15 +8,11 @@ from opac_regex import OPaCRegex
 '''
 class PathNode:
 
-    def __init__(self, name, parent=None, depth=0):
+    def __init__(self, name):
         self.name = name
         self.regexes = {}
         self.children = {}
         self.trigger = 8
-        self.weight = 1
-        #self.parent = parent
-
-        #self.same_depth = 0
 
 
     ''' Adds a new path into the tree.
@@ -49,9 +45,6 @@ class PathNode:
         if local_change:
             self.compress()
 
-        if local_change or child_change:
-            self.weight += 1
-
         return (local_change or child_change)
 
 
@@ -61,11 +54,12 @@ class PathNode:
 
         children_names = list(self.children.keys())
 
-        opac_regex = OPaCRegex(children_names)
-        regex = opac_regex.digest()
+        opac_regex = OPaCRegex()
+        regex = opac_regex.digest(children_names)
 
         matching_children = [child_name for child_name in children_names if re.match(regex, child_name)]
 
+        # 0.7 is a totally arbitrary value (70% of strings, match)
         if (len(matching_children)/len(children_names)) > 0.7:
 
             regex_node = PathNode(regex)
@@ -97,7 +91,7 @@ class PathNode:
         Prints the tree. Just for debugging uses
     '''
     def print_tree(self, depth=0):
-        print("----|"*depth + self.name + "(# of childs: {0} - weight: {1})".format(len(self.children), self.weight))
+        print("----|"*depth + self.name + "(# of childs: {0})".format(len(self.children)))
         
         for child in self.children:
             self.children[child].print_tree(depth+1)

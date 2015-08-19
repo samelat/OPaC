@@ -1,6 +1,9 @@
+#!/usr/bin/python3
+
 import re
 import sys
 import time
+import requests
 import urllib
 import urllib2
 import urlparse
@@ -9,7 +12,7 @@ from lxml import etree
 from opac import OPaC
 
 if len(sys.argv) < 2:
-    print './test <url>'
+    print('./test <url>')
     sys.exit(-1)
 domain = sys.argv[1]
 
@@ -67,15 +70,15 @@ for path in container:
 
     requests_count += 1
 
-    print '[URI({0}/{1})] {2}'.format(requests_count, len(container.paths), uri)
+    print('[URI({0}/{1})] {2}'.format(requests_count, len(container.paths), uri))
 
     paths = get_paths(uri)
     
     regexes = container.update(paths)
 
     for regex in regexes:
-        print '[FILTER] {0}'.format(regex)
+        print('[FILTER] {0}'.format(regex))
 
 end = time.time()
 
-print 'seconds: {0}'.format(end - begin)
+print('seconds: {0}'.format(end - begin))

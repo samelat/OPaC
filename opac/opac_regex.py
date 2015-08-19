@@ -13,15 +13,12 @@ class OPaCRegex:
 
         templates = {}
         for sample in samples:
-            print(sample)
             sample = Sample(sample)
             template = tuple(sample.template)
 
             if template not in templates:
                 templates[template] = []
             templates[template].append(sample)
-
-        print(templates)
 
         # Select Best Template and Its samples
         sorted_templates = [(len(samples), template) for template, samples in templates.items()]
@@ -37,20 +34,9 @@ class OPaCRegex:
             template.append(group)
 
         regex = ''
-        #for group in template:
-        #    group.sharpen()
-        #    regex += group.compile()
-
-        print(template[0].heights)
-        print(template[0].template)
-
-        template[0].sharpen()
-
-        print(template[0].heights)
-        print(template[0].template)
-        print('cardy: {0}'.format(template[0].cardinalities))
-
-        #print(template[0].raw_regex)
+        for group in template:
+            group.sharpen()
+            regex += group.compile()
 
         return regex
 
@@ -95,6 +81,10 @@ class RegexGroup:
             fix = [set(tokens) for tokens in zip(*fix_tokens)]
             group_cardinalities = []
 
+            self.heights = list(filter(bool, self.heights))
+            if not len(self.heights):
+                break
+
             for index in range(0, len(self.template[0])):
                 cardinality = set()
                 if self.template[0][index] in ['[^\\W_]', '\\d']:
@@ -104,7 +94,7 @@ class RegexGroup:
                     else:
                         fix[index] = fix[index].pop()
                         cardinality = {1}
-                        self.cardinalities[0][index].remove(len(fix[index]))
+                        self.cardinalities[0][index] -= {len(fix[index])}
                 else:
                     fix[index] = self.template[0][index]
                     cardinality = self.cardinalities[0][index]
@@ -124,41 +114,39 @@ class RegexGroup:
         self.cardinalities = cardinalities
 
 
-    def compile(self, template, heights):
-        print('[compile] heights: {0}'.format(heights))
-        print('[compile] template: {0}'.format(template))
-        for entry in self.entries.values():
-            print('[compile] entry: {0}'.format(entry['grouped_tokens']))
+    def cardinality_token(self, cardinality):
+        cardinality = list(cardinality)
+
+        if len(cardinality) > 2:
+            return '+'
+
+        elif len(cardinality) == 2:
+            cardinality.sort()
+            return '{{{0},{1}}}'.format(*cardinality)
+
+        elif (len(cardinality) == 1) and (cardinality[0] > 1):
+            return '{{{0}}}'.format(*cardinality)
+
+        return ''
+
+
+    def compile(self):
 
         regex = ''
-        for group_index in range(0, len(template)):
-            group = template[group_index]
-            group_regex = ''
-            for token in group:
-                group_regex += token
-                if token in ['[^\\W_]', '\\d']:
-                    group_regex += '+'
+        for group_index in range(0, len(self.template)):
+            if not self.heights[group_index]:
+                continue
 
-            group_heights = heights[group_index]
+            subregex = ''
+            for token_index in range(0, len(self.template[group_index])):
+                subregex += self.template[group_index][token_index]
+                subregex += self.cardinality_token(self.cardinalities[group_index][token_index])
 
-            if len(group_heights) == 1:
-                height = group_heights.pop()
-                if not height:
-                    continue
+            group_cardinality = self.cardinality_token(self.heights[group_index])
+            if group_cardinality:
+                subregex = '({0}){1}'.format(subregex, group_cardinality)
 
-                regex += group_regex
-                if height > 1:
-                    regex += '{{{0}}}'.format(height)
-
-            elif len(group_heights) == 2:
-                regex += '({0})'.format(group_regex)
-                group_range = list(group_heights)
-                group_range.sort()
-                regex += '{{{0},{1}}}'.format(*group_range)
-
-            else:
-                regex += '({0})'.format(group_regex)
-                regex += '+'
+            regex += subregex
 
         return regex
 
