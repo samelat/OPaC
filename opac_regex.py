@@ -40,12 +40,17 @@ class OPaCRegex:
         #for group in template:
         #    group.sharpen()
         #    regex += group.compile()
-        print(template[0].heights)
-        print(template[0].cardinalities)
-        print(template[0].prefix)
-        print(template[0].postfix)
 
-        print(best_template)
+        print(template[0].heights)
+        print(template[0].template)
+
+        template[0].sharpen()
+
+        print(template[0].heights)
+        print(template[0].template)
+        print('cardy: {0}'.format(template[0].cardinalities))
+
+        #print(template[0].raw_regex)
 
         return regex
 
@@ -57,13 +62,11 @@ class OPaCRegex:
 class RegexGroup:
     def __init__(self, template, index):
         self.index = index
-        self.template = template
+        self.template = [template]
         self.heights = set()
         self.cardinalities = []
-        for token_regex in self.template:
-            self.cardinalities.append(set())
-        self.prefix = None
-        self.postfix = None
+        self.cardinalities.append([set() for token_regex in self.template[0]])
+        self.fixes = [set(), set()] # Prefix and Postfix
 
 
     def use_sample(self, sample):
@@ -72,47 +75,53 @@ class RegexGroup:
         self.heights.add(sample.heights[self.index])
 
         group_sets = []
-        for token_index in range(0, len(self.template)):
+        for token_index in range(0, len(self.template[0])):
             token_set = set()
             for group_sample in group_samples:
-                self.cardinalities[token_index].add(len(group_sample[token_index]))
+                self.cardinalities[0][token_index].add(len(group_sample[token_index]))
                 token_set.add(group_sample[token_index])
             group_sets.append(token_set)
 
-        if not self.prefix:
-            self.prefix = [{token} for token in group_samples[0]]
-        else:
-            for group_index in range(0, len(self.postfix)):
-                self.prefix[group_index] = self.prefix[group_index].intersection(group_samples[0][group_index])
-
-        if not self.postfix:
-            self.postfix = [{token} for token in group_samples[-1]]
-        else:
-            for group_index in range(0, len(self.postfix)):
-                self.postfix[group_index] = self.postfix[group_index].intersection(group_samples[-1][group_index])
+        self.fixes[0].add(tuple(group_samples[0]))
+        self.fixes[1].add(tuple(group_samples[-1]))
 
 
     def sharpen(self):
+        
+        heights = []
+        template = []
+        cardinalities = []
+        for fix_tokens in self.fixes:
+            fix = [set(tokens) for tokens in zip(*fix_tokens)]
+            group_cardinalities = []
 
-        sharped_heights = []
-        sharped_template = []
-        for group_index in range(0, len(self.template)):
-            if grouped_tokens_union[group_index]:
-                tokens_group = [token for token in grouped_tokens[0][group_index]
-                                      if  token in grouped_tokens_union[group_index]]
-                for token in tokens_group:
-                    sharped_heights.append({1})
-                    sharped_template.append((token,))
-                    sharped_template.append(template[group_index])
+            for index in range(0, len(self.template[0])):
+                cardinality = set()
+                if self.template[0][index] in ['[^\\W_]', '\\d']:
+                    if len(fix[index]) > 1:
+                        fix[index] = self.template[0][index]
+                        cardinality = self.cardinalities[0][index]
+                    else:
+                        fix[index] = fix[index].pop()
+                        cardinality = {1}
+                        self.cardinalities[0][index].remove(len(fix[index]))
+                else:
+                    fix[index] = self.template[0][index]
+                    cardinality = self.cardinalities[0][index]
+                group_cardinalities.append(cardinality)
 
-                    updated_heights = set([height-1 for height in groups_heights_union[group_index]])
-                    sharped_heights.append(updated_heights)
+            if tuple(fix) != self.template[0]:
+                self.heights = [height-1 for height in self.heights]
+                heights.append([1])
+                cardinalities.append(group_cardinalities)
+                template.append(tuple(fix))
 
-            else:
-                sharped_heights.append(groups_heights_union[group_index])
-                sharped_template.append(template[group_index])
-
-        return (sharped_template, sharped_heights)
+        heights.insert(1, self.heights)
+        template.insert(1, self.template[0])
+        cardinalities.insert(1, self.cardinalities[0])
+        self.heights = heights
+        self.template = template
+        self.cardinalities = cardinalities
 
 
     def compile(self, template, heights):
