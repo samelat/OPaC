@@ -1,6 +1,6 @@
 import re
 import math
-from opac_regex import OPaCRegex
+from opac.opac_regex import OPaCRegex
 
 ''' ################################
         PRIVATE - PATHNODE CLASS
@@ -22,8 +22,8 @@ class PathNode:
         child_node = None
         child_name = path[0]
 
-        child_change = False
-        local_change = False
+        child_added = False
+        localy_added = False
 
         if child_name in self.children:
             child_node = self.children[child_name]
@@ -35,17 +35,17 @@ class PathNode:
                     break
                     
         if not child_node:
-            local_change = True
+            localy_added = True
             child_node = PathNode(child_name)
             self.children[child_name] = child_node
 
         if len(path) > 1:
-            child_change = child_node.add_path(path[1:])
+            child_added = child_node.add_path(path[1:])
 
-        if local_change:
+        if localy_added:
             self.compress()
 
-        return (local_change or child_change)
+        return (localy_added or child_added)
 
 
     def compress(self):

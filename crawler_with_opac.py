@@ -3,11 +3,10 @@
 import re
 import sys
 import time
-import requests
 import urllib
-import urllib2
-import urlparse
-from lxml import etree
+import requests
+from bs4 import BeautifulSoup
+from urllib import parse
 
 from opac import OPaC
 
@@ -16,22 +15,37 @@ if len(sys.argv) < 2:
     sys.exit(-1)
 domain = sys.argv[1]
 
-def get_paths(uri):
+error_pages = set()
+
+def get_paths(url):
     paths = []
     try:
-        data = urllib2.urlopen(uri).read()
+        
+        response = requests.get(url)
+        current_url = response.url
+        if not re.match('^' + url, current_url):
+            print('[!] Redirected to {0}'.format(current_url))
+            return []
 
-        tree = etree.HTML(data)
+        if (response.status_code != 200):
+            if (response.status_code in error_pages):
+                return []
+            else:
+                error_pages.add(response.status_code)
 
-        for element in tree.findall('.//a[@href]'):
-            href = element.attrib['href']
-            _uri = urlparse.urljoin(uri, href)
+        soap = BeautifulSoup(response.text)
 
-            paths.append(urllib.quote(urlparse.urlsplit(_uri).path))
+        tags = soap.find_all('a', href=True)
+        for tag in tags:
+            href = tag.attrs['href']
+            _url = parse.urljoin(current_url, href)
+
+            paths.append(parse.quote(parse.urlsplit(_url).path))
+
     except KeyboardInterrupt:
         sys.exit()
-    except:
-        return []
+    #except:
+    #    return []
 
     return paths
 
@@ -46,22 +60,20 @@ count = 0
 requests_count = 0
 last_size = 0
 
+print('[!] Starting ...')
 for path in container:
 
     # Do not make requests out of domain
-    uri = urlparse.urljoin(domain, path)
+    uri = parse.urljoin(domain, path)
     if domain not in uri:
         continue
 
-    request = urllib2.Request(uri)
-    request.get_method = lambda : "HEAD"
-
     try:
-        response = urllib2.urlopen(request)
+        response = requests.head(uri)
     except KeyboardInterrupt:
         break
-    except:
-        continue
+    #except:
+    #    continue
     
     # If we are not interested in the content type, we continue with
     # the next URI
@@ -73,11 +85,8 @@ for path in container:
     print('[URI({0}/{1})] {2}'.format(requests_count, len(container.paths), uri))
 
     paths = get_paths(uri)
-    
-    regexes = container.update(paths)
-
-    for regex in regexes:
-        print('[FILTER] {0}'.format(regex))
+    for path in paths:
+        container.add_path(path)
 
 end = time.time()
 

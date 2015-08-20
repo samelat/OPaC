@@ -2,7 +2,7 @@
 import string
 import random
 
-from opac_tree import PathNode
+from opac.opac_tree import PathNode
 
 
 ''' ################################
@@ -13,35 +13,34 @@ class OPaC:
     def __init__(self):
         self.paths = []
         self.trees = {}
-        self.count = 0
 
     def __iter__(self):
         return self
 
-    def next(self):
-        if not self.paths:
+    def __next__(self):
+        try:
+            request = self.paths.pop()
+            return request
+        except IndexError:
             raise StopIteration
-        else:
-            return self.paths.pop()
-
 
     def size(self):
         return sum([tree.weight for tree in self.trees])
 
+    def add_path(self, complete_path):
+        
+        clean_path = complete_path.strip('/')
 
-    def add_path(self, path):
+        if clean_path:
+            splitted_path = clean_path.split('/')
 
-        path = path.strip('/')
-        if path:
-            spath = path.split('/')
-
-            depth = len(spath)
+            depth = len(splitted_path)
 
             if depth not in self.trees:
                 self.trees[depth] = PathNode('')
 
-            if self.trees[depth].add_path(spath):
-                self.count += 1
+            if self.trees[depth].add_path(splitted_path):
+                self.paths.append(complete_path)
                 return True
 
         return False
