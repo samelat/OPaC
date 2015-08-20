@@ -25,7 +25,7 @@ class OPaC:
             raise StopIteration
 
     def size(self):
-        return sum([tree.weight for tree in self.trees])
+        return len(self.paths)
 
     def add_path(self, complete_path):
         

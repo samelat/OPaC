@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+'''
+    Under Construction!
+'''
+
 import re
 import sys
 import time
@@ -21,13 +25,13 @@ def get_paths(url):
     paths = []
     try:
         
-        response = requests.get(url)
-        current_url = response.url
-        if not re.match('^' + url, current_url):
-            print('[!] Redirected to {0}'.format(current_url))
+        response = requests.get(url, allow_redirects=False)
+        if response.status_code in range(300, 309):
+            print('[!] Status Code: {0} - Redirected to {1}'.format(response.status_code, url))
             return []
 
         if (response.status_code != 200):
+            print('[E] Status code {0}'.format(response.status_code))
             if (response.status_code in error_pages):
                 return []
             else:
@@ -38,9 +42,10 @@ def get_paths(url):
         tags = soap.find_all('a', href=True)
         for tag in tags:
             href = tag.attrs['href']
-            _url = parse.urljoin(current_url, href)
+            _url = parse.urljoin(url, href)
+            _url = parse.unquote(_url)
 
-            paths.append(parse.quote(parse.urlsplit(_url).path))
+            paths.append(parse.urlsplit(_url).path)
 
     except KeyboardInterrupt:
         sys.exit()
@@ -82,7 +87,7 @@ for path in container:
 
     requests_count += 1
 
-    print('[URI({0}/{1})] {2}'.format(requests_count, len(container.paths), uri))
+    print('[URI({0}/{1})] {2}'.format(requests_count, container.size(), uri))
 
     paths = get_paths(uri)
     for path in paths:
