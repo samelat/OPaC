@@ -1,4 +1,5 @@
 import re
+import collections
 
 ''' ##############################################################
 
@@ -158,8 +159,7 @@ class RegexGroup:
 class Sample:
 
     def __init__(self, sample):
-        self.tokens = re.findall('([^\W_]+|[\W_]+)', sample)
-        template = self.digest_tokens()
+        template = self.digest_tokens(sample)
         template = self.fragment(template)
         self.template, self.heights = self.compress(template)
         self.weights = [len(group) for group in self.template]
@@ -180,7 +180,18 @@ class Sample:
 
         return samples
 
-    def digest_tokens(self):
+    def digest_tokens(self, sample):
+        self.tokens = re.findall('([^\W_]+|[\W_]+)', sample)
+        delimiter = ''
+        delimiters = collections.Counter([token for token in self.tokens if len(token) == 1]).most_common(2)
+        if delimiters:
+            delimiters = list(zip(*delimiters))[0]
+            if '-' in delimiters:
+                delimiter = '-'
+            else:
+                delimiter = delimiters[0]
+            self.tokens = re.findall('([^\W]+|[\W_]+)', sample)
+
         regexes = []
         group = []
         for token in self.tokens:
@@ -188,9 +199,14 @@ class Sample:
                 regex_token = '\d'
 
             elif re.match('[^\W_]+', token[0]):
-                regex_token = '[^\W_]'
+                if delimiter == '_':
+                    regex_token = '[^\W_]'
+                else:
+                    regex_token = '[^\W]'
 
             else:
+                if (token[0] == '_') and (delimiter != '_'):
+                    continue
                 regex_token = '\\' + token[0]
 
             if regex_token in group:

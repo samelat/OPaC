@@ -2,17 +2,20 @@
 
 from opac.opac_regex import OPaCRegex
 
-kwords = [
-    'algo__dolares-reservas-cepo-herencia_0_1412858778.html',
-    'algo_Volvio-luego-tormentas-preven-tiempo_0_1412858913.html',
-    'algo__Salto-evacuados-podria-regresar-manana_0_1412858945.html',
-    'algo_Inundaciones-evacuados-Lujan-Areco-lluvias_0_1412858806.html',
-    'algo__scioli-inundaciones-macri_0_1412858912.html',
-    'algo_Paz-social-Acuerdo-oficial-inflacion_0_1412858813.html'
+kwords0 = [
+    'Guillermina_Valdes-separacion-Marcelo_Tinelli-fue-al-teatro_0_1321668164.html',
+    'DVD-Tuya-Claudia_Pineiro-Andrea_Pietra-Jorge_Marrale-Juana_Viale-Edgardo_Gonzalez_Amer_0_1395460874.html',
+    'Gianinna_Maradona-exploto-bronca-me-tienen-podrida_0_1268273408.html',
+    'Lucia_Celasco-Susana_Gimenez-Punta_del_Este-sensual-transparencias-sexy-nieta-joven-atuendo_0_1277872478.html',
+    'Andres_Calamaro-Micaela_Breque-Punta_del_Este-chivito-uruguayo-La_Barra-dieta-pescado-kilos_de_mas_0_1303069985.html'
+]
+
+kwords1 = [
+    ''
 ]
 
 oregex = OPaCRegex()
-regex = oregex.digest(kwords)
+regex = oregex.digest(kwords0)
 
 for keyword in kwords:
     print(keyword)

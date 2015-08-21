@@ -40,9 +40,12 @@ def get_paths(url):
         soap = BeautifulSoup(response.text)
 
         tags = soap.find_all('a', href=True)
+        #print('[URL] {0}'.format(url))
         for tag in tags:
             href = tag.attrs['href']
+            #print('[HREF] {0}'.format(href))
             _url = parse.urljoin(url, href)
+            #print('[NEWURL] {0}'.format(_url))
             _url = parse.unquote(_url)
 
             paths.append(parse.urlsplit(_url).path)

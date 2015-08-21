@@ -1,4 +1,5 @@
 
+import re
 import string
 import random
 
@@ -11,41 +12,36 @@ from opac.opac_tree import PathNode
 '''
 class OPaC:
     def __init__(self):
-        self.paths = []
+        self.paths = {}
         self.trees = {}
-        self.refresh_root = ''
+        self.current_depth = 0
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        try:
-            request = self.paths.pop()
-            return request
-        except IndexError:
-            raise StopIteration
+        for depth in self.paths:
+            if len(self.paths[depth]):
+                return self.paths[depth].pop()
+        raise StopIteration
 
     def size(self):
-        return len(self.paths)
+        return sum([len(paths) for paths in self.paths.values()])
 
-    def add_tree_path(self, complete_path):
+
+    def add_path(self, complete_path):
         clean_path = complete_path.strip('/')
         if clean_path:
             splitted_path = clean_path.split('/')
 
-            depth = len(splitted_path)
-            if depth not in self.trees:
-                self.trees[depth] = PathNode(name='', callback=self.refresh_callback)
-            return self.trees[depth].add_path(splitted_path):
+            self.current_depth = len(splitted_path)
+            if self.current_depth not in self.trees:
+                self.paths[self.current_depth] = []
+                self.trees[self.current_depth] = PathNode(name='', callback=self.refresh_callback)
 
-        return False
+            if self.trees[self.current_depth].add_path(splitted_path):
+                self.paths[self.current_depth].append(complete_path)
 
-    def add_path(self, complete_path):
-        if self.add_tree_path(complete_path):
-            self.paths.append(complete_path)
-
-            if self.refresh_root:
-                self.refresh()
             return True
 
         return False
@@ -53,10 +49,22 @@ class OPaC:
     ''' Refresh routines
     '''
     def refresh_callback(self, opac_node):
-        self.refresh_root = opac_node.get_root()
-        print('[!] REFRESH!: {0}'.format(self.refresh_root))
+        children = opac_node.children
+        opac_node.children = {}
 
-    def refresh(self):
+        root_path = opac_node.get_root()
+
         paths = []
-        for path in self.paths:
-            if re.match('^' + self.refresh_root, path) and self
+        for path in self.paths[self.current_depth]:
+            if re.match('^' + root_path, path):
+                subpath = path.replace(root_path, '')
+                splitted_path = subpath.strip('/').split('/')
+                if splitted_path[0] in opac_node.children:
+                    paths.append(path)
+
+            paths.append(path)
+        self.paths[self.current_depth] = paths
+
+        opac_node.children = children
+
+        print('[!] REFRESH!: {0}'.format(root_path))
