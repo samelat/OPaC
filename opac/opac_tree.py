@@ -8,11 +8,19 @@ from opac.opac_regex import OPaCRegex
 '''
 class PathNode:
 
-    def __init__(self, name):
+    def __init__(self, name, callback=None, parent=None):
         self.name = name
         self.regexes = {}
         self.children = {}
         self.trigger = 8
+        self.parent = parent
+
+        self.refresh_callback = callback
+
+    def get_root(self):
+        if not self.parent:
+            return ''
+        return self.parent.get_root() + '/' + self.name
 
 
     ''' Adds a new path into the tree.
@@ -36,21 +44,21 @@ class PathNode:
                     
         if not child_node:
             localy_added = True
-            child_node = PathNode(child_name)
+            child_node = PathNode(name=child_name, callback=self.refresh_callback, parent=self)
             self.children[child_name] = child_node
 
         if len(path) > 1:
             child_added = child_node.add_path(path[1:])
 
-        if localy_added:
-            self.compress()
+        if localy_added and self.compress() and self.refresh_callback:
+            self.refresh_callback(self)
 
         return (localy_added or child_added)
 
 
     def compress(self):
         if len(self.children) < self.trigger:
-            return
+            return False
 
         children_names = list(self.children.keys())
 
@@ -72,6 +80,9 @@ class PathNode:
             regex_node.compress()
         else:
             self.trigger = len(self.children) + 8
+            return False
+
+        return True
 
 
     def merge(self, node):
