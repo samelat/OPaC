@@ -19,6 +19,22 @@ class PathNode:
 
         self.refresh_callback = callback
 
+    '''
+        tree to String. Just for debugging uses
+    '''
+    def stringify(self, depth=0):
+
+        string = '----|'*depth + self.name + '(# of childs: {0})\n'.format(len(self.children))
+        
+        for child in self.children:
+            string += self.children[child].stringify(depth+1)
+
+        for child in self.regexes:
+            string += self.regexes[child].stringify(depth+1)
+
+        return string
+
+
     def get_root(self):
         if not self.parent:
             return ''
@@ -66,11 +82,9 @@ class PathNode:
 
         opac_regex = OPaCRegex()
         regex = opac_regex.digest(children_names)
-        print('[REGEX] {0}'.format(regex))
 
         matching_children = [child_name for child_name in children_names if re.match(regex, child_name)]
 
-        print('[REGEX] Match {0}/{1}'.format(len(matching_children), len(children_names)))
         if len(matching_children) > int(self.increment * 0.8):
 
             regex_node = PathNode(regex)
@@ -101,15 +115,4 @@ class PathNode:
 
             self.children[child_name] = child_node
 
-    '''
-        Prints the tree. Just for debugging uses
-    '''
-    def print_tree(self, depth=0):
-        print("----|"*depth + self.name + "(# of childs: {0})".format(len(self.children)))
-        
-        for child in self.children:
-            self.children[child].print_tree(depth+1)
-
-        for child in self.regexes:
-            self.regexes[child].print_tree(depth+1)
 
