@@ -15,6 +15,8 @@ class OPaC:
         self.paths = {}
         self.trees = {}
         self.current_depth = 0
+        
+        self.muzzle = False
 
     def __iter__(self):
         return self
@@ -49,8 +51,8 @@ class OPaC:
     ''' Refresh routines
     '''
     def refresh_callback(self, opac_node):
-        children = opac_node.children
-        opac_node.children = {}
+        if not self.muzzle:
+            return
 
         root_path = opac_node.get_root()
 
@@ -61,10 +63,7 @@ class OPaC:
                 splitted_path = subpath.strip('/').split('/')
                 if splitted_path[0] in opac_node.children:
                     paths.append(path)
+                continue
 
             paths.append(path)
         self.paths[self.current_depth] = paths
-
-        opac_node.children = children
-
-        print('[!] REFRESH!: {0}'.format(root_path))

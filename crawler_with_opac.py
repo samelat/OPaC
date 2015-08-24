@@ -27,13 +27,17 @@ def get_paths(url):
         
         response = requests.get(url, allow_redirects=False)
         if response.status_code in range(300, 309):
-            print('[!] Status Code: {0} - Redirected to {1}'.format(response.status_code, url))
-            return []
+            location = parse.urljoin(url, response.headers['location'])
+            print('[!] Status Code: {0} - Redirected to {1}'.format(response.status_code, location))
+            # If the redirect is inside the same site ...
+            if re.match('^' + url, location):
+                paths.append(location)
+            return paths
 
         if (response.status_code != 200):
             print('[E] Status code {0}'.format(response.status_code))
             if (response.status_code in error_pages):
-                return []
+                return paths
             else:
                 error_pages.add(response.status_code)
 
@@ -42,13 +46,19 @@ def get_paths(url):
         tags = soap.find_all('a', href=True)
         #print('[URL] {0}'.format(url))
         for tag in tags:
-            href = tag.attrs['href']
+            href = tag.attrs['href'].strip()
             #print('[HREF] {0}'.format(href))
             _url = parse.urljoin(url, href)
             #print('[NEWURL] {0}'.format(_url))
             _url = parse.unquote(_url)
 
-            paths.append(parse.urlsplit(_url).path)
+            #if '//' in _url:
+            #    print('[URL] {0}'.format(url))
+            #    print('[TAG] {0}'.format(href))
+            #    sys.exit()
+
+            if re.match('^' + url, _url):
+                paths.append(parse.urlsplit(_url).path)
 
     except KeyboardInterrupt:
         sys.exit()

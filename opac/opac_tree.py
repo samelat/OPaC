@@ -8,11 +8,13 @@ from opac.opac_regex import OPaCRegex
 '''
 class PathNode:
 
+    increment = 10
+
     def __init__(self, name, callback=None, parent=None):
         self.name = name
         self.regexes = {}
         self.children = {}
-        self.trigger = 8
+        self.trigger = self.increment
         self.parent = parent
 
         self.refresh_callback = callback
@@ -64,11 +66,12 @@ class PathNode:
 
         opac_regex = OPaCRegex()
         regex = opac_regex.digest(children_names)
+        print('[REGEX] {0}'.format(regex))
 
         matching_children = [child_name for child_name in children_names if re.match(regex, child_name)]
 
-        # 0.7 is a totally arbitrary value (70% of strings, match)
-        if (len(matching_children)/len(children_names)) > 0.7:
+        print('[REGEX] Match {0}/{1}'.format(len(matching_children), len(children_names)))
+        if len(matching_children) > int(self.increment * 0.8):
 
             regex_node = PathNode(regex)
             self.regexes[regex] = regex_node
@@ -79,7 +82,7 @@ class PathNode:
 
             regex_node.compress()
         else:
-            self.trigger = len(self.children) + 8
+            self.trigger = len(self.children) + self.increment
             return False
 
         return True

@@ -1,4 +1,6 @@
 import re
+import itertools
+import functools
 import collections
 
 ''' ##############################################################
@@ -15,6 +17,7 @@ class OPaCRegex:
         templates = {}
         for sample in samples:
             sample = Sample(sample)
+
             template = tuple(sample.template)
 
             if template not in templates:
@@ -31,7 +34,7 @@ class OPaCRegex:
         for group_index in range(0, len(best_template)):
             group = RegexGroup(best_template[group_index], group_index)
             for sample in self.samples:
-                group.use_sample(sample)
+                group.set_sample(sample)
             template.append(group)
 
         regex = ''
@@ -50,68 +53,69 @@ class RegexGroup:
     def __init__(self, template, index):
         self.index = index
         self.template = [template]
-        self.heights = set()
+        self.heights = [set()]
         self.cardinalities = []
         self.cardinalities.append([set() for token_regex in self.template[0]])
-        self.fixes = [set(), set()] # Prefix and Postfix
+        self.samples = []
 
 
-    def use_sample(self, sample):
+    def set_sample(self, sample):
 
-        group_samples = sample.group(self.index)
-        self.heights.add(sample.heights[self.index])
+        tokens_samples = sample.group(self.index)
 
-        group_sets = []
+        self.heights[0].add(sample.heights[self.index])
+
         for token_index in range(0, len(self.template[0])):
-            token_set = set()
-            for group_sample in group_samples:
-                self.cardinalities[0][token_index].add(len(group_sample[token_index]))
-                token_set.add(group_sample[token_index])
-            group_sets.append(token_set)
+            cardinalities = [len(token_sample) for token_sample in tokens_samples[token_index]]
+            self.cardinalities[0][token_index].update(cardinalities)
 
-        self.fixes[0].add(tuple(group_samples[0]))
-        self.fixes[1].add(tuple(group_samples[-1]))
+        self.samples.append(tokens_samples)
 
 
     def sharpen(self):
         
-        heights = []
-        template = []
-        cardinalities = []
-        for fix_tokens in self.fixes:
-            fix = [set(tokens) for tokens in zip(*fix_tokens)]
-            group_cardinalities = []
+        template_fixes = {0:[], -1:[]} # prefix, postfix
+        cardinalities_fixes = {0:[], -1:[]}
 
-            self.heights = list(filter(bool, self.heights))
-            if not len(self.heights):
-                break
+        self.template[0] = list(self.template[0])
+        for token_index in range(0, len(self.template[0])):
+            token_samples = [sample[token_index] for sample in self.samples]
 
-            for index in range(0, len(self.template[0])):
-                cardinality = set()
-                if self.template[0][index] in ['[^\\W_]', '\\d']:
-                    if len(fix[index]) > 1:
-                        fix[index] = self.template[0][index]
-                        cardinality = self.cardinalities[0][index]
-                    else:
-                        fix[index] = fix[index].pop()
-                        cardinality = {1}
-                        self.cardinalities[0][index] -= {len(fix[index])}
+            unique_samples = list(set(itertools.chain(*token_samples)))
+            if len(unique_samples) == 1:
+                self.template[0][token_index] = re.escape(unique_samples[0])
+                self.cardinalities[0][token_index] = {1}
+
+            for fix_index in template_fixes:
+                fix_tokens = set([token_sample[fix_index] for token_sample in token_samples])
+                if len(fix_tokens) == 1:
+                    template_fixes[fix_index].append(re.escape(fix_tokens.pop()))
+                    cardinalities_fixes[fix_index].append({1})
                 else:
-                    fix[index] = self.template[0][index]
-                    cardinality = self.cardinalities[0][index]
-                group_cardinalities.append(cardinality)
+                    template_fixes[fix_index].append(self.template[0][token_index])
+                    cardinalities_fixes[fix_index].append(self.cardinalities[0][token_index])
 
-            if tuple(fix) != self.template[0]:
-                self.heights = [height-1 for height in self.heights]
-                heights.append([1])
-                cardinalities.append(group_cardinalities)
-                template.append(tuple(fix))
+        self.template[0] = tuple(self.template[0])
 
-        heights.insert(1, self.heights)
-        template.insert(1, self.template[0])
-        cardinalities.insert(1, self.cardinalities[0])
+        heights = []
+        cardinalities = []
+        template = self.template[0]
+        for fix_index in template_fixes:
+            if not self.heights[0]:
+                break
+            fix = tuple(template_fixes[fix_index])
+            if fix != template:
+                insert_index = fix_index * (-len(self.template))
+                self.template.insert(insert_index, fix)
+                cardinalities.insert(insert_index, cardinalities_fixes[fix_index])
+
+                heights.insert(insert_index, [1])
+                self.heights[0] = [(height-1) for height in self.heights[0] if (height-1)]
+
+        heights.insert(1, self.heights[0])
         self.heights = heights
-        self.template = template
+
+        cardinalities.insert(1, self.cardinalities[0])
         self.cardinalities = cardinalities
 
 
@@ -163,6 +167,7 @@ class Sample:
         template = self.fragment(template)
         self.template, self.heights = self.compress(template)
         self.weights = [len(group) for group in self.template]
+        
 
     def __hash__(self):
         return hash(tuple(self.template))
@@ -178,45 +183,49 @@ class Sample:
 
             last_token_index = token_index + weight
 
-        return samples
+        return list(zip(*samples))
 
     def digest_tokens(self, sample):
         self.tokens = re.findall('([^\W_]+|[\W_]+)', sample)
-        delimiter = ''
+
+        word_regex = '[^\W_]'
         delimiters = collections.Counter([token for token in self.tokens if len(token) == 1]).most_common(2)
         if delimiters:
             delimiters = list(zip(*delimiters))[0]
-            if '-' in delimiters:
-                delimiter = '-'
-            else:
-                delimiter = delimiters[0]
-            self.tokens = re.findall('([^\W]+|[\W_]+)', sample)
+            delimiter = delimiters[0]
+            #self.tokens = re.findall('([^\W]+|[\W_]+)', sample)
+            if delimiter == '-':
+                word_regex = '[^\W]'
 
-        regexes = []
+        template = []
         group = []
+        tokens = []
         for token in self.tokens:
+
             if re.match('^\d+$', token):
                 regex_token = '\d'
 
+            elif group and re.match(group[-1], token):
+                tokens[-1] += token
+                continue
+
             elif re.match('[^\W_]+', token[0]):
-                if delimiter == '_':
-                    regex_token = '[^\W_]'
-                else:
-                    regex_token = '[^\W]'
+                regex_token = word_regex
 
             else:
-                if (token[0] == '_') and (delimiter != '_'):
-                    continue
-                regex_token = '\\' + token[0]
+                regex_token = re.escape(token)
 
             if regex_token in group:
-                regexes.append(tuple(group))
+                template.append(tuple(group))
                 group = []
-            
+
+            tokens.append(token)
             group.append(regex_token)
 
-        regexes.append(tuple(group))
-        return regexes
+        template.append(tuple(group))
+        self.tokens = tokens
+
+        return template
 
 
     def fragment(self, template):
