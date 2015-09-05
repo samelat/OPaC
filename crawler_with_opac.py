@@ -41,9 +41,13 @@ def get_paths(url):
             else:
                 error_pages.add(response.status_code)
 
-        soap = BeautifulSoup(response.text)
+        soup = BeautifulSoup(response.text)
 
-        tags = soap.find_all('a', href=True)
+        tag = soup.find('base')
+        base_url = tag.attrs['href'].strip() if tag and tag.has_attr('href') else ''
+        url = base_url if base_url else url
+
+        tags = soup.find_all('a', href=True)
         #print('[URL] {0}'.format(url))
         for tag in tags:
             href = tag.attrs['href'].strip()
