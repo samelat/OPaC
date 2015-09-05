@@ -43,8 +43,7 @@ class OPaC:
 
             if self.trees[self.current_depth].add_path(splitted_path):
                 self.paths[self.current_depth].append(complete_path)
-
-            return True
+                return True
 
         return False
 
