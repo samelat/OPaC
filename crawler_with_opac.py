@@ -104,7 +104,7 @@ for path in container:
 
     requests_count += 1
 
-    print('[URI({0}/{1})] {2}'.format(requests_count, container.size(), uri))
+    print('[URI({0}/{1})] {2}'.format(requests_count, len(container), uri))
 
     paths = get_paths(uri)
     for path in paths:

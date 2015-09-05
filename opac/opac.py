@@ -27,7 +27,7 @@ class OPaC:
                 return self.paths[depth].pop()
         raise StopIteration
 
-    def size(self):
+    def __len__(self):
         return sum([len(paths) for paths in self.paths.values()])
 
 
